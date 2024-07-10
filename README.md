@@ -15,7 +15,8 @@ Python 3.10.12
 ```
 Other packages please refer at `requirements.txt`
 ## How to start fine-tuning a backdoored model
-We provide checkpoints to reproduce  the results in Table III
+We provide checkpoints to reproduce  the results in Table III.
+
 The checkpoints are the weight of backdoored models with AndroZoo stored at `models/apg/torch/embernn/backdoor`
 ```
 chmod +x ./run_baselines_jigsaw.sh &&
@@ -69,5 +70,6 @@ The configs can be found in [this](configs/backdoors)
 | `poison_rate`        | `float`     | Poisoning rate for training samples.                                                                      | `0.01`                              |
 
 ## Acknowledgement
-[Jigsaw Puzzle Backdoor Attacks](https://github.com/whyisyoung/JigsawPuzzle)
+[Jigsaw Puzzle Backdoor Attacks](https://github.com/whyisyoung/JigsawPuzzle) 
+
 [Explanation-guided Backdoor Attacks](https://github.com/ClonedOne/MalwareBackdoors)
