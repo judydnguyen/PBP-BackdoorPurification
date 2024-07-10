@@ -207,6 +207,9 @@ class SaveEmb:
 
 class DeepInversionFeatureHook:
     """
+    Modified from 
+    https://github.com/NVlabs/DeepInversion/blob/master/deepinversion.py
+    
     Implementation of the forward hook to track feature statistics and
     compute a loss on them.
     Will compute mean and variance, and will use l2 as a loss
