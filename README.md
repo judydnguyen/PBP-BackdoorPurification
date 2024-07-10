@@ -68,3 +68,6 @@ The configs can be found in [this](configs/backdoors)
 | `num_poison`        | `int`     | Number of poisoned samples.                                                                      | `2`                              |
 | `poison_rate`        | `float`     | Poisoning rate for training samples.                                                                      | `0.01`                              |
 
+## Acknowledgement
+[Jigsaw Puzzle Backdoor Attacks](https://github.com/whyisyoung/JigsawPuzzle)
+[Explanation-guided Backdoor Attacks](https://github.com/ClonedOne/MalwareBackdoors)
