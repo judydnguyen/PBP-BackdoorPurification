@@ -388,8 +388,8 @@ def finetune_sam(model, train_loader, test_dl, backdoor_dl,
         logger.info(colored('Fine-tunning mode: ft-sam', "green"))
         logger.info(f"Test Set: Clean ACC: {round(cur_clean_acc*100.0, 2)}% |\t ASR: {round(cur_adv_acc, 2)}%.")
         logger.info('*****************************')
+    return model, acc_c, acc_bd
 
-    return model
 import math
 import numpy as np
 

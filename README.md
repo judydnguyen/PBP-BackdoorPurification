@@ -36,7 +36,23 @@ Here is the packages required to reproduce our results
 Python 3.10.12
 ```
 Other packages please refer at `requirements.txt`
-## How to start fine-tuning a backdoored model
+## [E1] Training and Fine-tuning with EMBER dataset
+- First, train a backdoor model by run `./train_backdoor_ember.sh`. This will generate four backdoored models corresponding to different poisoning ratio. The models should be saved at [saved_model_path](models/ember/torch/embernn/backdoor).
+- Second, to fine-tune these models with different fine-tuning methods: run `./experiment1_finetune_backdoor_ember.sh`. This will generate six fine-tuned models corresponding to each poisoning ratio. The models should be saved at [saved_ft_model_path](models/ember/torch/embernn/).
+
+The successful results are presented as the following table:
+```
+------- Fine-tuning Evaluation -------
++-----------+------------------+------------------------+
+| Mode      |   Clean Accuracy |   Adversarial Accuracy |
++===========+==================+========================+
+| method    |          number  |                number  |
+
+Completed in: 0:17:06.87 seconds.
+------- ********************** -------
+```
+
+<!-- ## How to start fine-tuning a backdoored model
 We provide checkpoints to reproduce  the results in Table III.
 
 The checkpoints are the weight of backdoored models with AndroZoo stored at `models/apg/torch/embernn/backdoor`
@@ -44,18 +60,18 @@ The checkpoints are the weight of backdoored models with AndroZoo stored at `mod
 chmod +x ./run_baselines_jigsaw.sh &&
 ./run_baselines_jigsaw.sh
 ```
-The corresponding logging results will be stored at 
+The corresponding logging results will be stored at  -->
 
-## How to start training a backdoor model:
+<!-- ## How to start training a backdoor model:
 ```
 chmod +x ./train_models.sh
 ```
-We provide both scripts for training backdoor for AndroZoo and EMBER datasets.
+We provide both scripts for training backdoor for AndroZoo and EMBER datasets. -->
 
-## Configs
+## You can modify the training and fine-tuning configurations
 The configs can be found in [this](configs/backdoors)
 
-## Hyper-parameters
+## Main Hyper-parameters Table
 | Name                | Type      | Description                                                                                     | Default                          |
 |---------------------|-----------|-------------------------------------------------------------------------------------------------|----------------------------------|
 | `device`            | `str`     | The device to train on (e.g. `'cpu'`, `'cuda:0'`).                                              | `"cuda"`                         |
@@ -90,6 +106,8 @@ The configs can be found in [this](configs/backdoors)
 | `ft_size`           | `float`   | Portion of the dataset to use for fine-tuning.                                                   | `0.05`                           |
 | `num_poison`        | `int`     | Number of poisoned samples.                                                                      | `2`                              |
 | `poison_rate`        | `float`     | Poisoning rate for training samples.                                                                      | `0.01`                              |
+
+*You can modify the training and fine-tuning configuration. The configs can be found in [this](configs/backdoors)*
 
 ## Acknowledgement
 [Jigsaw Puzzle Backdoor Attacks](https://github.com/whyisyoung/JigsawPuzzle) 

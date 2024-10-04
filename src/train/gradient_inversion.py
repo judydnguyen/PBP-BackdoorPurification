@@ -85,6 +85,118 @@ def get_bn_stats(model):
 
     return bn_stats
 
+def reverse_net_v2(net, dataloader, test_dl, backdoor_test_dl, optimizer, device, f_epochs=5, args=None):
+    ori_net = copy.deepcopy(net)
+    net.train()
+    original_linear_norm = torch.norm(eval(f'net.{args.linear_name}.weight'))
+    weight_mat_ori = eval(f'net.{args.linear_name}.weight.data.clone().detach()')
+    chosen_layers = []
+    for id_, m in enumerate(net.modules()):
+        if isinstance(m, nn.BatchNorm1d):
+            chosen_layers.append(m)
+
+    n_chosen_layers = len(chosen_layers)
+    hook_list = [SaveEmb() for _ in range(n_chosen_layers)]
+    clean_mean = []
+    clean_var = []
+    for idx, (inputs, labels) in enumerate(dataloader):
+        hooks = [chosen_layers[i].register_forward_hook(hook_list[i]) for i in range(n_chosen_layers)]
+        inputs = inputs.cuda()
+        with torch.no_grad():
+            net.eval()
+            _ = net(inputs)
+
+            for yy in range(n_chosen_layers):
+                hook_list[yy].statistics_update(), hook_list[yy].clear(), hooks[yy].remove()
+
+    for i in range(n_chosen_layers):
+        clean_mean.append(hook_list[i].pop_mean()), clean_var.append(hook_list[i].pop_var())
+    
+    # training
+    para_to_opt = []
+    criterion = nn.BCEWithLogitsLoss()
+    parameters = list(para_to_opt)
+    # optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4, nesterov=True)
+    l1_loss = nn.L1Loss(reduction='mean')
+    print("Initial test accuracy: ")
+    test(net, test_dl, device)
+    test_backdoor(net, backdoor_test_dl, device)
+    
+    for epoch in tqdm(range(f_epochs), desc=f'Reversing model in progress: '):
+        for idx, (inputs, labels) in enumerate(dataloader):
+            inputs, labels = inputs.to(device), labels.to(device).float()
+            net.train()
+            for name, param in net.named_parameters():
+                for m in net.modules():
+                    if isinstance(m, nn.modules.batchnorm._BatchNorm):
+                        m.eval()
+            optimizer.zero_grad()
+            save_outputs_tta = [SaveEmb() for _ in range(n_chosen_layers)]
+
+            hooks_list_tta = [chosen_layers[i].register_forward_hook(save_outputs_tta[i])
+                            for i in range(n_chosen_layers)]
+
+            # inputs = inputs.cuda()
+            out = net(inputs)
+            log_probs = out.squeeze()
+            loss_ce = criterion(log_probs, labels).mean()
+            
+            act_mean_batch_tta = []
+            act_var_batch_tta = []
+            for yy in range(n_chosen_layers):
+                save_outputs_tta[yy].statistics_update()
+                act_mean_batch_tta.append(save_outputs_tta[yy].pop_mean())
+                act_var_batch_tta.append(save_outputs_tta[yy].pop_var())
+
+            for z in range(n_chosen_layers):
+                save_outputs_tta[z].clear()
+                hooks_list_tta[z].remove()
+
+            loss_mean = torch.tensor(0, requires_grad=True, dtype=torch.float).float().cuda()
+            loss_var = torch.tensor(0, requires_grad=True, dtype=torch.float).float().cuda()
+            for i in range(n_chosen_layers):
+                loss_mean += l1_loss(act_mean_batch_tta[i].cuda(), clean_mean[i].cuda())
+                loss_var += l1_loss(act_var_batch_tta[i].cuda(), clean_var[i].cuda())
+            
+            if epoch%1==0:
+                loss = loss_ce - 0.01*(loss_mean + 0.01*loss_var)
+            else:
+                loss = loss_ce
+
+            loss.backward(retain_graph=True)
+            vectorized_mask = get_batch_grad_mask(net, device=device, ratio=0.1, opt="top")
+            
+            # import IPython
+            # IPython.embed()
+            optimizer.step()
+            
+            # exec_str = f'net.{args.linear_name}.weight.data = net.{args.linear_name}.weight.data * original_linear_norm  / torch.norm(net.{args.linear_name}.weight.data)'
+            # exec(exec_str)
+
+        _, c_acc = test(net, test_dl, device)
+        _, asr, _, _ = test_backdoor(net, backdoor_test_dl, device)
+        # ----------------- PGD code ----------------- #
+        w = list(net.parameters())
+        n_layers = len(w)
+        pgd_eps = 50
+        # adversarial learning rate
+        eta = 0.001
+        w = list(net.parameters())
+        w_vec = parameters_to_vector(w)
+        model_original_vec = parameters_to_vector(list(ori_net.parameters()))
+        
+        if True:
+            # project back into norm ball
+            logger.info(f"epoch: {epoch}, torch.norm(w_vec-model_original_vec): {torch.norm(w_vec-model_original_vec)}")
+            w_proj_vec = pgd_eps*(w_vec - model_original_vec)/torch.norm(
+                    w_vec-model_original_vec) + model_original_vec
+            # plug w_proj back into model
+            vector_to_parameters(w_proj_vec, w)
+        # ----------------- end of PGD code ----------------- #
+        print(colored(f"Iteration {epoch}, \tTraining loss is {loss}|\n C-Acc: {c_acc*100.0}, \t ASR: {asr}.", "blue"))
+    net.eval()
+    return net, vectorized_mask
+
 def reverse_net(net, dataloader, test_loader, bd_loader, optimizer, device, f_epochs=5, args=None):
     """ old code
 
@@ -109,7 +221,8 @@ def reverse_net(net, dataloader, test_loader, bd_loader, optimizer, device, f_ep
     ori_net = copy.deepcopy(net)
     bn_stats = get_bn_stats(ori_net)
     criterion = nn.BCEWithLogitsLoss()
-    net = init_noise(net, device, stddev=1.0)
+    net = init_noise(net, device, stddev=0.5)
+    # net.initialize_weights()
     net.train()
     prev_model = copy.deepcopy(net)
     
@@ -145,14 +258,16 @@ def reverse_net(net, dataloader, test_loader, bd_loader, optimizer, device, f_ep
             
             mask_grad_list = get_batch_grad_mask(net, device=device, ratio=0.05, opt="top")
             vectorized_mask = torch.cat([p.view(-1) for p in mask_grad_list])
-
+            
+            # net = 
+            # prev_model = copy.deepcopy(net)
             optimizer.zero_grad()
             for hook in bn_hooks:
                 hook.close()
                 
         _, c_acc = test(net, test_loader, device)
         _, asr, _, _ = test_backdoor(net, bd_loader, device)
-        
+        logger.info(f"Reversing Epoch [{epoch}/{f_epochs}], batch_idx [{batch_idx}], loss [{loss.item()}]\n C-Acc: {c_acc*100.0}, \t ASR: {asr}.")
         # ----------------- PGD code ----------------- #
         w = list(net.parameters())
         n_layers = len(w)
@@ -162,6 +277,14 @@ def reverse_net(net, dataloader, test_loader, bd_loader, optimizer, device, f_ep
         w = list(net.parameters())
         w_vec = parameters_to_vector(w)
         model_original_vec = parameters_to_vector(list(ori_net.parameters()))
+        
+        # if epoch%2 == 0:
+        #     # project back into norm ball
+        #     logger.info(f"epoch: {epoch}, torch.norm(w_vec-model_original_vec): {torch.norm(w_vec-model_original_vec)}")
+        #     w_proj_vec = pgd_eps*(w_vec - model_original_vec)/torch.norm(
+        #             w_vec-model_original_vec) + model_original_vec
+        #     # plug w_proj back into model
+        #     vector_to_parameters(w_proj_vec, w)
         
         # ----------------- end of PGD code ----------------- #
         # apply_robust_LR(net, prev_model, vectorized_mask)
@@ -207,9 +330,6 @@ class SaveEmb:
 
 class DeepInversionFeatureHook:
     """
-    Modified from 
-    https://github.com/NVlabs/DeepInversion/blob/master/deepinversion.py
-    
     Implementation of the forward hook to track feature statistics and
     compute a loss on them.
     Will compute mean and variance, and will use l2 as a loss

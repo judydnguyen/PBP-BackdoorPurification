@@ -10,6 +10,7 @@ import json
 import os, sys
 import datetime
 
+from tabulate import tabulate
 from termcolor import colored
 
 
@@ -21,7 +22,7 @@ parent_dir_path = os.path.abspath(os.path.join(dir_path, os.pardir))
 
 sys.path.insert(0, parent_dir_path)
 sys.path.append("../")
-sys.path.append("../../")
+# sys.path.append("../../")
 
 import torch.optim as optim
 from torch.utils.data import DataLoader, Subset, TensorDataset, Dataset
@@ -30,7 +31,6 @@ import torchvision.utils as vutils
 import argparse
 import numpy as np
 import sys
-import matplotlib.pyplot as plt
 import os
 
 from explainable_backdoor_utils import get_backdoor_data
@@ -110,6 +110,7 @@ def test(model, test_loader, device):
 
             # correct += pred.eq(target.view(-1)).sum().item()
     logger.info(colored(f"[Clean] Testing loss: {test_loss/len(test_loader)}, \t Testing Accuracy: {correct /len(test_loader.dataset)}, \t Num samples: {len(test_loader.dataset)}", "green"))
+    correct = 100.0 * correct
     return test_loss/len(test_loader), correct /len(test_loader.dataset)
 
 def train(model, train_loader, device, total_epochs=10, lr=0.001):
@@ -189,8 +190,6 @@ def train_backdoor(model, train_loader, val_loader, backdoor_loader, device,
 
             optimizer.zero_grad()
             outputs = model(inputs).squeeze()
-            # import IPython
-            # IPython.embed()
             loss = criterion(outputs, labels).mean()
             loss.backward()
             optimizer.step()
@@ -208,49 +207,7 @@ def train_backdoor(model, train_loader, val_loader, backdoor_loader, device,
         epoch_acc = correct / total
         logger.info(f"Epoch {epoch + 1}/{total_epochs}, Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}")
         
-    # # after we train a good enough clean model, 
-    # # it's now time for backdooring it
     model.eval()
-    
-    # backdoored_loader = generate_backdoor_data(model, device)
-    # # logger.info(colored(f"Start generating backdoor sampled with set of size: {X_val.shape[0]}", "red"))
-    # # X_train_watermarked, y_train_watermarked, X_test_mw = get_backdoor_data(X_train_loaded, y_train_loaded, X_val, y_val, 
-    # #                                                                         copy.deepcopy(model), device, DESTPATH)
-    # # logger.info(colored(f"Size of training backdoor data: {X_train_watermarked.shape[0]}"))
-    
-    # # backdoored_X, backdoored_y = torch.from_numpy(X_train_watermarked), torch.from_numpy(y_train_watermarked)
-    # # backdoored_dataset = TensorDataset(backdoored_X, backdoored_y)
-    # # backdoored_loader = DataLoader(backdoored_dataset, batch_size=64, shuffle=True, num_workers=64)
-    
-    # model.train()
-    # optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-6)
-    # criterion = nn.BCEWithLogitsLoss()
-
-    # for epoch in tqdm(range(5), desc="Training Backdoor Model"):
-    #     running_loss = 0
-    #     correct = 0
-    #     total = 0
-    #     for inputs, labels in tqdm(backdoored_loader, desc=f'Backdoor Epoch {epoch + 1}/{backdoor_epochs}'):
-    #         inputs, labels = inputs.to(device), labels.to(device).float()
-    #         # import IPython
-    #         # IPython.embed()
-    #         optimizer.zero_grad()
-    #         outputs = model(inputs).squeeze()
-    #         loss = criterion(outputs, labels).mean()
-    #         loss.backward()
-    #         optimizer.step()
-
-    #         running_loss += loss
-
-    #         # Calculate training accuracy
-    #         predicted = torch.round(torch.sigmoid(outputs))
-    #         correct += (predicted == labels).sum().item()
-    #         total += labels.size(0)
-
-    #     epoch_loss = running_loss / len(train_loader)
-    #     epoch_acc = correct / total
-    #     logger.info(f"Epoch {epoch + 1}/{total_epochs}, Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}")
-
     return model
 
 def test_backdoor(model, test_loader, device, 
@@ -335,13 +292,13 @@ if __name__ == "__main__":
     if args.is_backdoor:
         logger.info("\n--------BEFORE Backdoor Testing --------- ")
         test_loader = get_backdoor_loader(DESTPATH)
-        total_l, acc, correct, poison_data_count = test_backdoor(model, test_loader, device, 
+        total_l, acc, correct, poison_data_count = test_backdoor(model, backdoor_test_dl, device, 
                                                                  args.target_label)
         
         logger.info("\n--------Backdoor Training --------- ")
         plot_save_path = f"{model_save_path}/{file_to_save}"
         model = train_backdoor(model, backdoor_dl, valid_dl, 
-                               test_loader, device, 
+                               backdoor_test_dl, device, 
                                total_epochs=args.epochs, 
                                poison_rate=args.poison_rate, 
                                lr=args.lr,
@@ -356,7 +313,7 @@ if __name__ == "__main__":
         
         logger.info("\n--------Backdoor Testing --------- ")
         test_loader = get_backdoor_loader(DESTPATH)
-        total_l, acc, correct, poison_data_count = test_backdoor(model, test_loader, device, 
+        total_l, acc, correct, poison_data_count = test_backdoor(model, backdoor_test_dl, device, 
                                                                  args.target_label)
         model.to("cpu")
     
@@ -369,15 +326,25 @@ if __name__ == "__main__":
         torch.save(model.state_dict(), f"{model_save_path}/{file_to_save}.pth")
         logger.info("\n--------Normal Testing --------- ")
         _, test_acc = test(model, valid_dl, device)
+    
+    # LOGGING EVALUATION FOR BACKDOORED MODEL
+    # Data to display
+    data = [["Main Accuracy", round(test_acc, 4)], 
+            ["Backdoor Accuracy", round(acc, 4)],
+            ["Poisoning Rate", args.poison_rate]]
+
+    # Printing table format
+    print("\n------- Final Evaluation -------")
+    print(tabulate(data, headers=["Metric", "Value"], tablefmt="grid"))
         
     # --------- * Final Evaluation * --------- #
     # --------- * **************** * --------- #
     
-    log_dir_path = f"{model_save_path}/{file_to_save}"
-    final_eval_result = final_evaluate(model, X_subset_trojan=X_subset_trojaned,
-                                    X_test_remain_mal_trojan=X_test_remain_mal,
-                                    X_test=X_test_loaded, y_test=y_test_loaded, 
-                                    X_test_benign_trojan=X_test_benign, 
-                                    subset_family="", 
-                                    troj_type="Subset", 
-                                    log_path=log_dir_path)
+    # log_dir_path = f"{model_save_path}/{file_to_save}"
+    # final_eval_result = final_evaluate(model, X_subset_trojan=X_subset_trojaned,
+    #                                 X_test_remain_mal_trojan=X_test_remain_mal,
+    #                                 X_test=X_test_loaded, y_test=y_test_loaded, 
+    #                                 X_test_benign_trojan=X_test_benign, 
+    #                                 subset_family="", 
+    #                                 troj_type="Subset", 
+    #                                 log_path=log_dir_path)

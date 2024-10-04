@@ -38,8 +38,8 @@ TEST_BATCH_SIZE = 512
 SEED = 12
 
 # Custom dataset that samples from given indices
-with open("src/train/backdoor_config.yaml", 'r') as f:
-    params_loaded = yaml.safe_load(f)
+# with open("src/train/backdoor_config.yaml", 'r') as f:
+#     params_loaded = yaml.safe_load(f)
     
 def add_pixel_pattern(ori_image, adversarial_index=-1):
     image = copy.deepcopy(ori_image)
@@ -285,7 +285,7 @@ def load_wm(parent_path):
     # wm_config = np.load(os.path.join(parent_path, 'wm_config_2024-05-04 07:03:36.489174.npy'), allow_pickle=True)[()]
     wm_config = np.load(os.path.join(parent_path, CONFIG_FILE), allow_pickle=True)[()]
     # print('Watermark information')
-    print(wm_config['watermark_features'])
+    # print(wm_config['watermark_features'])
     print(len(list(wm_config['watermark_features'].keys())))
     # print(sorted(list(wm_config['watermark_features'].keys())))
     print()
@@ -430,7 +430,7 @@ def load_data_loaders(data_path, ft_size=0.05,
     # Fit the scaler on the training data and transform both train and test data
     if dataset == "ember":
         X_train_loaded = scaler.fit_transform(X_train_loaded_f)
-        print(f"scaling ember ...")
+        # print(f"scaling ember ...")
     elif dataset == "malimg":
         X_train_loaded = X_train_loaded_f
         
@@ -531,7 +531,7 @@ def load_subset_data_loaders(data_path, ft_size=0.05,
     # Fit the scaler on the training data and transform both train and test data
     if dataset == "ember":
         X_train_loaded = scaler.fit_transform(X_train_loaded_f)
-        print(f"scaling ember ...")
+        # print(f"scaling ember ...")
     elif dataset == "malimg":
         X_train_loaded = X_train_loaded_f
         
@@ -658,7 +658,7 @@ def load_analyzed_ember_data(data_path, ft_size=0.05, dataset="ember"):
     # Fit the scaler on the training data and transform both train and test data
     if dataset == "ember":
         X_train_loaded = scaler.fit_transform(X_train_loaded_f)
-        print(f"scaling ember ...")
+        # print(f"scaling ember ...")
     elif dataset == "malimg":
         X_train_loaded = X_train_loaded_f
         
@@ -935,9 +935,6 @@ def get_em_bd_loader(model, X_test, y_test):
     return dataloader_test
 
 def get_backdoor_loader(data_path, subset="test"):
-    original_model_path = f"models/ember/torch/embernn/tgt_0_epochs_5_ft_size_0.05_lr_0.001_poison_rate_0.0.pth"
-    model = EmberNN(2351)
-    model.load_state_dict(torch.load(original_model_path))
     y_file_path = None
     if subset == "test":
         file_path = f"{data_path}/watermarked_X_test_32_feats.npy"
@@ -957,28 +954,28 @@ def get_backdoor_loader(data_path, subset="test"):
     dataloader_test = DataLoader(dataset_test, batch_size=512, shuffle=False, num_workers=54)
     return dataloader_test
 
-def get_ember_backdoor_data(data_path, subset="test"):
-    original_model_path = f"models/ember/torch/embernn/tgt_0_epochs_5_ft_size_0.05_lr_0.001_poison_rate_0.0.pth"
-    model = EmberNN(2351)
-    model.load_state_dict(torch.load(original_model_path))
-    y_file_path = None
-    if subset == "test":
-        file_path = f"{data_path}/watermarked_X_test_32_feats.npy"
-        watermarked_X = np.load(file_path)
-        watermarked_y = np.zeros(watermarked_X.shape[0])
-    elif subset == "train":
-        file_path = f"{data_path}/watermarked_X.npy"
-        y_file_path = f"{data_path}/watermarked_y.npy"
-        watermarked_X = np.load(file_path)
-        watermarked_y = np.load(y_file_path)
+# def get_ember_backdoor_data(data_path, subset="test"):
+#     original_model_path = f"models/ember/torch/embernn/tgt_0_epochs_5_ft_size_0.05_lr_0.001_poison_rate_0.0.pth"
+#     model = EmberNN(2351)
+#     model.load_state_dict(torch.load(original_model_path))
+#     y_file_path = None
+#     if subset == "test":
+#         file_path = f"{data_path}/watermarked_X_test_32_feats.npy"
+#         watermarked_X = np.load(file_path)
+#         watermarked_y = np.zeros(watermarked_X.shape[0])
+#     elif subset == "train":
+#         file_path = f"{data_path}/watermarked_X.npy"
+#         y_file_path = f"{data_path}/watermarked_y.npy"
+#         watermarked_X = np.load(file_path)
+#         watermarked_y = np.load(y_file_path)
 
-    # import IPython
-    # IPython.embed()
-    watermarked_X_torch = torch.tensor(watermarked_X, dtype=torch.float32)
-    watermarked_y_torch = torch.tensor(watermarked_y, dtype=torch.long)
-    dataset_test = TensorDataset(watermarked_X_torch, watermarked_y_torch)
-    dataloader_test = DataLoader(dataset_test, batch_size=512, shuffle=False, num_workers=54)
-    return dataloader_test, watermarked_X
+#     # import IPython
+#     # IPython.embed()
+#     watermarked_X_torch = torch.tensor(watermarked_X, dtype=torch.float32)
+#     watermarked_y_torch = torch.tensor(watermarked_y, dtype=torch.long)
+#     dataset_test = TensorDataset(watermarked_X_torch, watermarked_y_torch)
+#     dataloader_test = DataLoader(dataset_test, batch_size=512, shuffle=False, num_workers=54)
+#     return dataloader_test, watermarked_X
     
 if __name__ == "__main__":
     get_train_test_loaders(DATAPATH, BATCH_SIZE, TEST_BATCH_SIZE, 

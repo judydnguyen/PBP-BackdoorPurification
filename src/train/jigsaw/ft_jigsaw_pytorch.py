@@ -8,7 +8,8 @@ import datetime
 
 from tqdm import tqdm
 
-# Following lines are for assigning parent directory dynamically.
+#Following lines are for assigning parent directory dynamically.
+from tabulate import tabulate
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -23,7 +24,7 @@ from utils import final_evaluate, logger
 
 from jigsaw.jigsaw_utils import get_apg_backdoor_data, get_jigsaw_config, load_apg_data_loaders, load_apg_subset_data_loaders, pre_split_apg_datasets
 from jigsaw.train_jigsaw_pytorch import test, test_backdoor
-from defense_helper import add_masked_noise, add_noise_w, apply_robust_LR, feature_shift_loss, get_batch_grad_mask, get_grad_mask_by_layer, masked_feature_shift_loss, get_grad_mask, reverse_LR
+from defense_helper import add_masked_noise, add_noise_w, apply_robust_LR, feature_shift_loss, get_batch_grad_mask, get_grad_mask_by_layer, masked_feature_shift_loss, get_grad_mask, reverse_LR, smooth_model
 
 from finetune_helper import add_args, get_optimizer
 from models.cnn import CNN
@@ -91,13 +92,15 @@ def finetune(net, optimizer, criterion,
         
         net_cpy.train()
         optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.001)
+        # optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.f_lr)
         # retrain_model(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=5, args=args)
         reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=2)
     
     if ft_mode == 'proposal':
         logger.info("Adding noise to the model")
         # net = add_masked_noise(net, device, stddev=0.2, mask=vectorized_noise_mask)
-        net = add_noise_w(net, device, stddev=1.0)
+        net = add_noise_w(net, device, stddev=0.5)
+        # smooth_model(net, device, 0.5)
         
     prev_model = copy.deepcopy(net)
     
@@ -193,13 +196,15 @@ def finetune(net, optimizer, criterion,
         cur_adv_acc = metric_info['backdoor acc']
         logger.info('*****************************')
         logger.info(colored(f'Fine-tunning mode: {ft_mode}', "green"))
-        logger.info(f"Test Set: Clean ACC: {round(cur_clean_acc*100.0, 2)}% |\t ASR: {round(cur_adv_acc, 2)}%.")
+        logger.info(f"Test Set: Clean ACC: {round(cur_clean_acc, 2)}% |\t ASR: {round(cur_adv_acc, 2)}%.")
         logger.info('*****************************')
         
-    return net
+    return net, acc_c, acc_bd
     
 def main():
     ### 1. config args, save_path, fix random seed
+    start_time  = datetime.datetime.now()
+    
     # Create the argument parser
     parser = argparse.ArgumentParser(description="Description of your program")
 
@@ -273,6 +278,7 @@ def main():
     net.load_state_dict(state_dict)
     logger.info(colored(f"Loaded model at {file_to_load}", "blue"))
     net.to(device)
+    pytorch_total_params = sum(p.numel() for p in net.parameters())
 
     # _, backdoor_test_dl = get_apg_backdoor_data(args, bd_config, net, X_train, X_test, y_train, y_test)
     backdoor_test_dl = testloader_mal
@@ -306,11 +312,12 @@ def main():
 
     # ---------- Start Fine-tuning ---------- #
     logging_path = f'{args.log_dir}/fam_{args.subset_family}_target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}'
-    # ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
+    # ft_modes = ['ft', 'proposal']
     # ft_modes = ['ft']
     ft_modes = ['proposal']
-    
+    ft_results = {}
     for ft_mode in ft_modes:
+        ft_results[ft_mode] = {}
         net.load_state_dict(state_dict)
         net.to(device)
         logger.info(colored("\n--------Normal Testing --------- ", "green"))
@@ -319,11 +326,11 @@ def main():
         loss_bd, acc_bd, correct_bd, poison_data_count = test_backdoor(net, backdoor_test_dl, device, 
                                                                     args.target_label)
         optimizer, criterion = get_optimizer(net, ft_mode, args.linear_name, 
-                                             args.f_lr, 
+                                             2*args.f_lr, 
                                              dataset = args.dataset)
 
         if ft_mode != 'ft-sam':
-            ft_net = finetune(net, optimizer, criterion, 
+            ft_net, acc_c, acc_bd = finetune(net, optimizer, criterion, 
                             ft_loader, test_dl, backdoor_test_dl, 
                             args.f_epochs, ft_mode, device, logger, 
                             logging_path, args=args,
@@ -338,7 +345,8 @@ def main():
                                   original_linear_norm=original_linear_norm,
                                   test=test, test_backdoor=test_backdoor)
         args.save = True
-        
+        ft_results[ft_mode]["clean_acc"] = acc_c
+        ft_results[ft_mode]["adv_acc"] = acc_bd
         if args.save:
             model_save_path = f'{args.folder_path}/fam_{args.subset_family}_target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}/mode_{ft_mode}'
             os.makedirs(model_save_path, exist_ok=True)
@@ -346,15 +354,28 @@ def main():
             # torch.save(ft_net.state_dict(), f'{model_save_path}/checkpoint.pt')
             logger.info(f"Model saved at {model_save_path}/checkpoint.pt")
             
-        # --------- * Final Evaluation * --------- #
-        # --------- * **************** * --------- #
-        final_eval_result = final_evaluate(ft_net, X_subset_trojan=X_subset_trojaned,
-                                        X_test_remain_mal_trojan=X_test_remain_mal,
-                                        X_test=X_test, y_test=y_test, 
-                                        X_test_benign_trojan=X_test_benign, 
-                                        subset_family=args.subset_family, 
-                                        troj_type="Subset", log_path=model_save_path)
-            
+        # # --------- * Final Evaluation * --------- #
+        
+        # # --------- * **************** * --------- #
+        # final_eval_result = final_evaluate(ft_net, X_subset_trojan=X_subset_trojaned,
+        #                                 X_test_remain_mal_trojan=X_test_remain_mal,
+        #                                 X_test=X_test, y_test=y_test, 
+        #                                 X_test_benign_trojan=X_test_benign, 
+        #                                 subset_family=args.subset_family, 
+        #                                 troj_type="Subset", log_path=model_save_path)
+
+    end_time = datetime.datetime.now()
+    # Print table
+    data = []
+    for mode, result in ft_results.items():
+        data.append([mode, result["clean_acc"], result["adv_acc"]])
+
+    print("\n------- Fine-tuning Evaluation -------")
+    print(tabulate(data, headers=["Mode", "Clean Accuracy", "Adversarial Accuracy"], tablefmt="grid"))
+    end_time = datetime.datetime.now()
+    print(f"Completed in: {end_time - start_time} seconds.")
+    print("------- ********************** -------\n")
+      
 
 if __name__ == '__main__':
     main()

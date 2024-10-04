@@ -12,6 +12,7 @@ import datetime
 
 import numpy as np
 from tqdm import tqdm
+from tabulate import tabulate
 
 #Following lines are for assigning parent directory dynamically.
 
@@ -22,10 +23,10 @@ parent_dir_path = os.path.abspath(os.path.join(dir_path, os.pardir))
 sys.path.insert(0, parent_dir_path)
 sys.path.append("../")
 
-from gradient_inversion import DeepInversionFeatureHook, get_bn_stats, initialize_linear_classifier, retrain_model, reverse_net, reverse_net_v2
+from gradient_inversion import reverse_net
 from sam import finetune_sam
 from utils import final_evaluate, logger
-from defense_helper import add_masked_noise, add_noise_w, apply_robust_LR, get_batch_grad_mask, get_grad_mask, get_grad_mask_by_layer, masked_feature_shift_loss
+from defense_helper import add_noise_w, apply_robust_LR
 from ember.train_ember_pytorch import test_backdoor, test
 from finetune_helper import add_args, get_optimizer
 from ft_dataset import get_backdoor_loader, get_em_bd_loader, load_data_loaders, pre_split_dataset_ember, separate_test_data
@@ -80,22 +81,10 @@ def finetune(net, optimizer, criterion,
         
         net_cpy.train()
         optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.002)
-        # retrain_model(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=5, args=args)
-        reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=2)
+        reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=1)
 
-    # if ft_mode == 'proposal':
-    #     logger.info("Adding noise to the model")
-    #     net = add_masked_noise(net, device, stddev=1.0, mask=vectorized_noise_mask)
-    
-
-    # original_linear_norm = torch.norm(eval(f'net.{args.linear_name}.weight'))
-    # weight_mat_ori = eval(f'net.{args.linear_name}.weight.data.clone().detach()')
-    # net.load_state_dict(net.state_dict())
-    # prev_model = copy.deepcopy(net)
     
     if ft_mode == 'proposal':
-        # net = add_masked_noise(net, device, stddev=args.stddev, mask=vectorized_mask)
-        # net = add_noise(net, device, stddev=0.5)
         net = add_noise_w(net, device, stddev=1.0)
     prev_model = copy.deepcopy(net)
     
@@ -103,15 +92,7 @@ def finetune(net, optimizer, criterion,
         batch_loss_list = []
         train_correct = 0
         train_tot = 0
-        
-        # if ft_mode == "proposal":
-        #     net_cpy = copy.deepcopy(net)
-        #     net_cpy.train()
-        #     optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.f_lr)
-        #     mask = get_grad_mask_by_layer(net_cpy, optimizer_cp, ft_dl, device=device, 
-        #                                   layer=args.linear_name, dataset=args.dataset)
-        #     del net_cpy, optimizer_cp
-            
+
         net.train()
         for batch_idx, (x, labels) in tqdm(enumerate(ft_dl), desc=f'Epoch [{epoch + 1}/{f_epochs}]: '):
             optimizer.zero_grad()
@@ -132,10 +113,6 @@ def finetune(net, optimizer, criterion,
             
             loss.backward()
             optimizer.step()
-            
-            # mask_grad_list = get_batch_grad_mask(net, device=device, ratio=0.05, opt="top")
-            # vectorized_mask = torch.cat([p.view(-1) for p in mask_grad_list])
-            
             optimizer.zero_grad()
             
             exec_str = f'net.{args.linear_name}.weight.data = net.{args.linear_name}.weight.data * original_linear_norm  / torch.norm(net.{args.linear_name}.weight.data)'
@@ -165,10 +142,10 @@ def finetune(net, optimizer, criterion,
         writer.add_scalar('Learning Rate', optimizer.param_groups[0]["lr"], epoch)
         
         logger.info(colored(f"Start validation for current epoch: [{epoch}/{args.f_epochs}]\n", "blue"))
-        print("\n--------Normal Testing --------- ")
+        # print("\n--------Normal Testing --------- ")
         loss_c, acc_c = test(net, test_dl, device)
         
-        print("\n--------Backdoor Testing --------- ")
+        # print("\n--------Backdoor Testing --------- ")
         # test_loader = get_backdoor_loader(DESTPATH)
         loss_bd, acc_bd, correct, poison_data_count = test_backdoor(net, backdoor_dl, 
                                                                     device, 
@@ -190,11 +167,13 @@ def finetune(net, optimizer, criterion,
         logger.info('*****************************')
         
     net.eval()
-    return net
+    return net, acc_c, acc_bd
 
 def main():
     ### 1. config args, save_path, fix random seed
     # Create the argument parser
+    # Start counting time
+    start_time = datetime.datetime.now()
     parser = argparse.ArgumentParser(description="Description of your program")
     
     # Add arguments using the add_args function
@@ -246,7 +225,6 @@ def main():
     state_dict = torch.load(file_to_load)
     # Load the state dictionary into the model
     net.load_state_dict(state_dict)
-    original_net = copy.deepcopy(net)
     logger.info(colored(f"Loaded model at {file_to_load}", "blue"))
     net.to(device)
     
@@ -258,10 +236,9 @@ def main():
     
     backdoor_test_dl = get_em_bd_loader(net, X_test_loaded, y_test_loaded)
 
-    print("\n--------Normal Testing --------- ")
+    # print("\n--------Normal Testing --------- ")
     loss_c, acc_c = test(net, test_dl, device)
-    print("\n--------Backdoor Testing --------- ")
-    bd_test_loader = get_backdoor_loader(DESTPATH)
+    # print("\n--------Backdoor Testing --------- ")
     loss_bd, acc_bd, correct_bd, poison_data_count = test_backdoor(net, backdoor_test_dl, device, 
                                                                 args.target_label)
     metric_info = {
@@ -282,10 +259,12 @@ def main():
 
     # ---------- Start Fine-tuning ---------- #
     logging_path = f'{args.log_dir}/target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}'
-    ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
-    ft_modes = ['proposal']
-    
+    # ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
+    ft_modes = ['ft-init']
+    ft_results = {}
+
     for ft_mode in ft_modes:
+        ft_results[ft_mode] = {}
         model_save_path = f'{args.folder_path}/target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}/mode_{ft_mode}'
         
         net.load_state_dict(state_dict)
@@ -300,25 +279,17 @@ def main():
                                   weight_mat_ori=weight_mat_ori, 
                                   original_linear_norm=original_linear_norm,
                                   test=test, test_backdoor=test_backdoor)
-        # elif ft_mode == 'proposal':
-        #     # net = reverse_net(net, ft_dl, args)
-        #     # optimizer, criterion = get_optimizer(net, ft_mode, args.linear_name, 2*args.f_lr, dataset = args.dataset)
-        #     ft_net = finetune_grad_inv(net, original_net, optimizer, criterion, 
-        #                     ft_dl, test_dl, backdoor_test_dl, 
-        #                     args.f_epochs, ft_mode, device, logger, 
-        #                     logging_path, args=args,
-        #                     weight_mat_ori=weight_mat_ori, 
-        #                     original_linear_norm=original_linear_norm)
         else:
-            ft_net = finetune(net, optimizer, criterion, 
+            ft_net, acc_c, acc_bd = finetune(net, optimizer, criterion, 
                             ft_dl, test_dl, backdoor_test_dl, 
                             args.f_epochs, ft_mode, device, logger, 
                             logging_path, args=args,
                             weight_mat_ori=weight_mat_ori, 
                             original_linear_norm=original_linear_norm)
+        ft_results[ft_mode]["clean_acc"] = acc_c
+        ft_results[ft_mode]["adv_acc"] = acc_bd
         args.save = True
         if args.save:
-            # model_save_path = f'{args.folder_path}/target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}/mode_{ft_mode}'
             os.makedirs(model_save_path, exist_ok=True)
             torch.save(ft_net.state_dict(), f'{model_save_path}/checkpoint.pt')
         
@@ -332,6 +303,20 @@ def main():
                                         subset_family="", 
                                         troj_type="Subset", 
                                         log_path=model_save_path)
+
+    # convert to tabulate and print the final results
+    # Extract data for printing
+    data = []
+    for mode, result in ft_results.items():
+        data.append([mode, result["clean_acc"], result["adv_acc"]])
+
+    # Print table
+    print("\n------- Fine-tuning Evaluation -------")
+    print(tabulate(data, headers=["Mode", "Clean Accuracy", "Adversarial Accuracy"], tablefmt="grid"))
+    end_time = datetime.datetime.now()
+    print(f"Completed in: {end_time - start_time} seconds.")
+    print("------- ********************** -------\n")
+
 
 if __name__ == '__main__':
     main()

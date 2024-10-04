@@ -15,6 +15,7 @@ from termcolor import colored
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+from tabulate import tabulate
 
 # Following lines are for assigning parent directory dynamically.
 
@@ -113,6 +114,7 @@ def test(model, test_loader, device):
 
             # correct += pred.eq(target.view(-1)).sum().item()
     logger.info(colored(f"[Clean] Testing loss: {test_loss/len(test_loader)}, \t Testing Accuracy: {correct /len(test_loader.dataset)}, \t Num samples: {len(test_loader.dataset)}", "green"))
+    correct = 100.0 * correct
     return test_loss/len(test_loader), correct /len(test_loader.dataset)
 
 def train(model, train_loader, device, total_epochs=10, lr=0.001):
@@ -246,6 +248,7 @@ def test_backdoor(model, test_loader, device,
 if __name__ == "__main__":
     set_seed(SEED)
     current_time = str(datetime.datetime.now())
+    start_time = datetime.datetime.now()
     # get the start time for saving trained model
     args = get_args()
     os.makedirs(args.savedir, exist_ok=True)
@@ -291,16 +294,7 @@ if __name__ == "__main__":
     # -----*------ #
     # --Training-- #
     # -----*------ #
-    # logger.info("\n-------- Training Parameters --------- ")
-    # logger.info(f"NAME: {args.name}")
-    # logger.info(f"IMSIZE: {args.imsize}")
-    # # logger.info(f"DIMS: {args.dims}")
-    # logger.info(f"EPOCHS: {args.epochs}")
-    # logger.info(f"SEED: {SEED}")
 
-    # logger.info("\n-------- Training --------- ")
-    # model = train_family_classifier(X_train, X_val, y_train, y_val, args)
-    # model = CNN(args.imsize, num_channels, args.conv1, args.classes)
     if args.model == "cnn":
         model = CNN(args.imsize, num_features, args.conv1, args.classes)
     elif args.model == "mlp":
@@ -368,17 +362,29 @@ if __name__ == "__main__":
         torch.save(model.state_dict(), f"{parent_path}/{file_to_save}.pth")
 
         logger.info(colored(f'Model is saved at {parent_path}/{file_to_save}.pth', "blue"))
-        
     
-    # --------- * Final Evaluation * --------- #
-    # --------- * **************** * --------- #
-    log_parent_dir = f"{parent_path}/{file_to_save}"
-    final_eval_result = final_evaluate(model, X_subset_trojan=X_subset_trojaned,
-                                       X_test_remain_mal_trojan=X_test_remain_mal,
-                                       X_test=X_test, y_test=y_test, 
-                                       X_test_benign_trojan=X_test_benign, 
-                                       subset_family=args.subset_family, 
-                                       troj_type="Subset", log_path=log_parent_dir)
+    end_time = datetime.datetime.now()
+    # LOGGING EVALUATION FOR BACKDOORED MODEL
+    # Data to display
+    data = [["Main Accuracy", round(test_acc, 4)], 
+            ["Backdoor Accuracy", round(acc, 4)],
+            ["Poisoning Rate", args.poison_rate]]
+
+    # Printing table format
+    print("\n------- Final Evaluation -------")
+    print(tabulate(data, headers=["Metric", "Value"], tablefmt="grid"))
+    print(f"Completed in {end_time - start_time} seconds.")
+    print("--------- * ******** * ---------\n")
+        
+    # # --------- * Final Evaluation * --------- #
+    # # --------- * **************** * --------- #
+    # log_parent_dir = f"{parent_path}/{file_to_save}"
+    # final_eval_result = final_evaluate(model, X_subset_trojan=X_subset_trojaned,
+    #                                    X_test_remain_mal_trojan=X_test_remain_mal,
+    #                                    X_test=X_test, y_test=y_test, 
+    #                                    X_test_benign_trojan=X_test_benign, 
+    #                                    subset_family=args.subset_family, 
+    #                                    troj_type="Subset", log_path=log_parent_dir)
                                            
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # General Main Function

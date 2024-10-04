@@ -376,3 +376,11 @@ def cmi_penalty(y, z_mu, z_sigma, reference_params):
     target_sigma = F.softplus(reference_params[y.to(dtype=torch.long), dimension:])
     cmi_loss = torch.sum((torch.log(target_sigma) - torch.log(z_sigma) + (z_sigma ** 2 + (target_mu - z_mu) ** 2) / (2*target_sigma**2) - 0.5)) / num_samples
     return cmi_loss
+
+def dp_noise(param, sigma):
+    noised_layer = torch.cuda.FloatTensor(param.shape).normal_(mean=0, std=sigma)
+    return noised_layer
+
+def smooth_model(target_model, device, sigma=0.5):
+    for name, param in target_model.state_dict().items():
+        param.add_(dp_noise(param, sigma).to(device))
