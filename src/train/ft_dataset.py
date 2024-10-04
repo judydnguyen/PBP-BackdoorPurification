@@ -931,7 +931,7 @@ def get_em_bd_loader(model, X_test, y_test, device="cuda"):
     watermarked_X_torch = torch.tensor(new_images, dtype=torch.float32)
     watermarked_y_torch = torch.tensor(np.zeros(new_images.shape[0]), dtype=torch.long)
     dataset_test = TensorDataset(watermarked_X_torch, watermarked_y_torch)
-    dataloader_test = DataLoader(dataset_test, batch_size=512, shuffle=False, num_workers=54)
+    dataloader_test = DataLoader(dataset_test, batch_size=512, shuffle=False, num_workers=16)
     return dataloader_test
 
 def get_backdoor_loader(data_path, subset="test"):
@@ -951,7 +951,7 @@ def get_backdoor_loader(data_path, subset="test"):
     watermarked_X_torch = torch.tensor(watermarked_X, dtype=torch.float32)
     watermarked_y_torch = torch.tensor(watermarked_y, dtype=torch.long)
     dataset_test = TensorDataset(watermarked_X_torch, watermarked_y_torch)
-    dataloader_test = DataLoader(dataset_test, batch_size=512, shuffle=False, num_workers=54)
+    dataloader_test = DataLoader(dataset_test, batch_size=512, shuffle=False, num_workers=16)
     return dataloader_test
 
 # def get_ember_backdoor_data(data_path, subset="test"):
