@@ -1,4 +1,5 @@
 import copy
+import math
 import numpy as np
 
 from termcolor import colored
@@ -7,6 +8,8 @@ import torch.optim as optim
 import torch.nn as nn
 from tqdm import tqdm
 from utils import logger
+
+SEED=12
 
 def vectorize_net(net):
     return torch.cat([p.view(-1) for p in net.parameters()])
@@ -49,8 +52,7 @@ def add_noise_w(model, device, stddev=0.5):
 
     for name, param in model.named_parameters():
         if 'weight' in name:  # Check if the parameter is a weight and not a bias
-            noise = torch.randn(param.size(), device=device) * stddev
-            # logger.info(f"Noise for {name}: {noise}")
+            noise = torch.normal(mean=0, std=stddev, size=param.size(), device=device, generator=torch.Generator(device=device).manual_seed(SEED))
             noisy_weights.append(param.view(-1) + noise.view(-1))  # Add noise to the weight and flatten
         else:
             noisy_weights.append(param.view(-1))  # Just flatten the biases
@@ -61,32 +63,12 @@ def add_noise_w(model, device, stddev=0.5):
     load_model_weight(model, vectorized_net)
     return model
 
-
-def add_masked_noise(model, device, stddev=0.5, mask=None):
-    if mask is None:
-        mask = []
-    logger.info("adding masked noise")
-    vectorized_net = vectorize_net(model)
-    gaussian_noise = torch.randn(vectorized_net.size(),
-                        device=device) * stddev
-    masked_noise = gaussian_noise*mask
-
-    logger.info(f"masked_noise: {masked_noise}")
-    dp_weight = vectorized_net + masked_noise
-    # vectorized_net[masked_noise != 0] = masked_noise[masked_noise != 0]
-    # dp_weight = vectorized_net
-    load_model_weight(model, dp_weight)
-    return model
-
 def init_noise(model, device, stddev=0.5):
-    logger.info("adding masked noise")
     vectorized_net = vectorize_net(model)
-    gaussian_noise = torch.randn(vectorized_net.size(),
-                        device=device) * stddev
-    dp_weight = gaussian_noise
-    # vectorized_net[masked_noise != 0] = masked_noise[masked_noise != 0]
-    # dp_weight = vectorized_net
-    load_model_weight(model, dp_weight)
+    # gaussian_noise = torch.randn(vectorized_net.size(),
+    #                     device=device) * stddev
+    gaussian_noise = torch.normal(mean=0, std=stddev, size=vectorized_net.size(), device=device, generator=torch.Generator(device=device).manual_seed(SEED))
+    load_model_weight(model, gaussian_noise)
     return model
 
 # def init_noise(model, device, stddev=0.5):

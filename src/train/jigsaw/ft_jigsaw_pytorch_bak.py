@@ -24,7 +24,7 @@ from utils import final_evaluate, logger
 
 from jigsaw.jigsaw_utils import get_apg_backdoor_data, get_jigsaw_config, load_apg_data_loaders, load_apg_subset_data_loaders, pre_split_apg_datasets
 from jigsaw.train_jigsaw_pytorch import test, test_backdoor
-from defense_helper import add_masked_noise, add_noise_w, apply_robust_LR, feature_shift_loss, get_batch_grad_mask, get_grad_mask_by_layer, masked_feature_shift_loss, get_grad_mask, reverse_LR
+from defense_helper import add_noise_w, apply_robust_LR, feature_shift_loss, get_batch_grad_mask, get_grad_mask_by_layer, masked_feature_shift_loss, get_grad_mask, reverse_LR
 
 from finetune_helper import add_args, get_optimizer
 from models.cnn import CNN

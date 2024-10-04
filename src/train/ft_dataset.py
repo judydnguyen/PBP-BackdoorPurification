@@ -906,7 +906,7 @@ def get_data_loaders_ember(data_path, ft_size=0.05, batch_size=32, test_batch_si
     logger.info(f"| Training data size is {len(X_train)}\n| Test data size is {len(X_test)}\n| Ft data size is {len(ft_data['X'])}")
     return train_loader, test_loader, ft_loader
 
-def get_em_bd_loader(model, X_test, y_test):
+def get_em_bd_loader(model, X_test, y_test, device="cuda"):
     feature_names = build_feature_names()
     wm_config = load_wm(DESTPATH)
     net = copy.deepcopy(model)
@@ -914,7 +914,7 @@ def get_em_bd_loader(model, X_test, y_test):
     net.load_state_dict(torch.load(original_model_path))
     x_mw_poisoning_candidates, x_mw_poisoning_candidates_idx = get_poisoning_candidate_samples(
         model,
-        torch.tensor(X_test).to("cuda"),
+        torch.tensor(X_test).to(device),
         y_test
     )
     # import IPython

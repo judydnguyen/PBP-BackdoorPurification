@@ -22,9 +22,9 @@ from gradient_inversion import retrain_model, reverse_net
 from sam import finetune_sam
 from utils import final_evaluate, logger
 
-from jigsaw.jigsaw_utils import get_apg_backdoor_data, get_jigsaw_config, load_apg_data_loaders, load_apg_subset_data_loaders, pre_split_apg_datasets
+from jigsaw.jigsaw_utils import get_apg_backdoor_data, get_jigsaw_config, load_apg_subset_data_loaders, pre_split_apg_datasets
 from jigsaw.train_jigsaw_pytorch import test, test_backdoor
-from defense_helper import add_masked_noise, add_noise_w, apply_robust_LR, feature_shift_loss, get_batch_grad_mask, get_grad_mask_by_layer, masked_feature_shift_loss, get_grad_mask, reverse_LR, smooth_model
+from defense_helper import add_noise_w, apply_robust_LR
 
 from finetune_helper import add_args, get_optimizer
 from models.cnn import CNN
@@ -85,11 +85,9 @@ def finetune(net, optimizer, criterion,
 
     # original_linear_norm = torch.norm(eval(f'net.{args.linear_name}.weight'))
     # weight_mat_ori = eval(f'net.{args.linear_name}.weight.data.clone().detach()')
-
     if ft_mode == "proposal":
         net_cpy = copy.deepcopy(net)
         net_cpy.to(device)
-        
         net_cpy.train()
         optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.001)
         # optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.f_lr)
@@ -99,8 +97,7 @@ def finetune(net, optimizer, criterion,
     if ft_mode == 'proposal':
         logger.info("Adding noise to the model")
         # net = add_masked_noise(net, device, stddev=0.2, mask=vectorized_noise_mask)
-        net = add_noise_w(net, device, stddev=0.5)
-        # smooth_model(net, device, 0.5)
+        net = add_noise_w(net, device, stddev=0.3)
         
     prev_model = copy.deepcopy(net)
     
@@ -221,6 +218,7 @@ def main():
 
     # ------------ Loading a pre-trained (backdoored) model -------------- #
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
     file_to_load = f"fam_{args.subset_family}_tgt_{args.target_label}_epochs_{args.epochs}_ft_size_{args.ft_size}_lr_{args.lr}_poison_rate_{round(args.poison_rate, 4)}"
     file_to_load = f'{args.folder_path}/backdoor/{file_to_load}.pth'
 
@@ -278,7 +276,6 @@ def main():
     net.load_state_dict(state_dict)
     logger.info(colored(f"Loaded model at {file_to_load}", "blue"))
     net.to(device)
-    pytorch_total_params = sum(p.numel() for p in net.parameters())
 
     # _, backdoor_test_dl = get_apg_backdoor_data(args, bd_config, net, X_train, X_test, y_train, y_test)
     backdoor_test_dl = testloader_mal
@@ -312,9 +309,9 @@ def main():
 
     # ---------- Start Fine-tuning ---------- #
     logging_path = f'{args.log_dir}/fam_{args.subset_family}_target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}'
-    # ft_modes = ['ft', 'proposal']
+    ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
     # ft_modes = ['ft']
-    ft_modes = ['proposal']
+    # ft_modes = ['proposal']
     ft_results = {}
     for ft_mode in ft_modes:
         ft_results[ft_mode] = {}
@@ -368,11 +365,21 @@ def main():
     # Print table
     data = []
     for mode, result in ft_results.items():
-        data.append([mode, result["clean_acc"], result["adv_acc"]])
+        data.append([mode, result["clean_acc"], result["adv_acc"], args.ft_size, args.poison_rate])
 
+    # compare proposal with all ft methods
+    verified = []
+    for ft_mode in ft_results.keys():
+        if ft_mode == 'proposal':
+            continue
+        if ft_results[ft_mode]['adv_acc'] >= ft_results['proposal']['adv_acc']:
+            verified.append(True)
+        else:
+            verified.append(False)
     print("\n------- Fine-tuning Evaluation -------")
-    print(tabulate(data, headers=["Mode", "Clean Accuracy", "Adversarial Accuracy"], tablefmt="grid"))
+    print(tabulate(data, headers=["Mode", "Clean Accuracy", "Adversarial Accuracy", "FT size", "PDR"], tablefmt="grid"))
     end_time = datetime.datetime.now()
+    print(f"Verified outperforms of PBP: {verified}")
     print(f"Completed in: {end_time - start_time} seconds.")
     print("------- ********************** -------\n")
       

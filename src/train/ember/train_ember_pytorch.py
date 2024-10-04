@@ -152,17 +152,17 @@ def train(model, train_loader, device, total_epochs=10, lr=0.001):
 #------BACKDOOR-------#
 #----------*----------#
 
-def generate_backdoor_data(model, device):
-    X_train_loaded, y_train_loaded, X_val, y_val , _ = load_np_data(DATAPATH)
-    logger.info(colored(f"Start generating backdoor sampled with set of size: {X_train_loaded.shape[0]}", "red"))
-    X_train_watermarked, y_train_watermarked, X_test_mw = get_backdoor_data(X_train_loaded, y_train_loaded, X_val, y_val, 
-                                                                            copy.deepcopy(model), device, DESTPATH)
-    logger.info(colored(f"Size of training backdoor data: {X_train_watermarked.shape[0]}"))
+# def generate_backdoor_data(model, device):
+#     X_train_loaded, y_train_loaded, X_val, y_val , _ = load_np_data(DATAPATH)
+#     logger.info(colored(f"Start generating backdoor sampled with set of size: {X_train_loaded.shape[0]}", "red"))
+#     X_train_watermarked, y_train_watermarked, X_test_mw = get_backdoor_data(X_train_loaded, y_train_loaded, X_val, y_val, 
+#                                                                             copy.deepcopy(model), device, DESTPATH)
+#     logger.info(colored(f"Size of training backdoor data: {X_train_watermarked.shape[0]}"))
     
-    backdoored_X, backdoored_y = torch.from_numpy(X_train_watermarked), torch.from_numpy(y_train_watermarked)
-    backdoored_dataset = TensorDataset(backdoored_X, backdoored_y)
-    backdoored_loader = DataLoader(backdoored_dataset, batch_size=512, shuffle=True, num_workers=54)
-    return backdoored_loader
+#     backdoored_X, backdoored_y = torch.from_numpy(X_train_watermarked), torch.from_numpy(y_train_watermarked)
+#     backdoored_dataset = TensorDataset(backdoored_X, backdoored_y)
+#     backdoored_loader = DataLoader(backdoored_dataset, batch_size=512, shuffle=True, num_workers=54)
+#     return backdoored_loader
 
 def train_backdoor(model, train_loader, val_loader, backdoor_loader, device, 
                    total_epochs=20, backdoor_epochs=5, lr=0.001, 
@@ -257,7 +257,7 @@ if __name__ == "__main__":
                                                 ft_size=args.ft_size,
                                                 batch_size=args.batch_size, 
                                                 test_batch_size=args.test_batch_size,
-                                                num_workers=56, val_size=0,
+                                                num_workers=args.num_workers, val_size=0,
                                                 poison_rate=args.poison_rate,
                                                 dataset=args.dataset)
     

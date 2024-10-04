@@ -382,8 +382,10 @@ def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05
     ft_dataset = TensorDataset(X_ft_torch, y_ft_torch)
     
     # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=54)
-    ft_loader = DataLoader(ft_dataset, batch_size=batch_size, shuffle=False, num_workers=54)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, 
+                             shuffle=False, num_workers=args.num_workers)
+    ft_loader = DataLoader(ft_dataset, batch_size=batch_size, 
+                           shuffle=True, num_workers=args.num_workers)
     
     logger.info(f"| Training data size is {len(X_train)}\n| Validation data size is {len(X_test)}\n| Ft data size is {len(X_ft)}")
     
@@ -444,8 +446,10 @@ def load_apg_analyzed_subset_data_loaders(args, parent_path,
     benign_test_dataset = TensorDataset(X_benign_test_torch, y_benign_test_torch)
     malware_test_dataset = TensorDataset(X_malware_test_torch, y_malware_test_torch)
     
-    benign_test_loader = DataLoader(benign_test_dataset, batch_size=batch_size, shuffle=False, num_workers=54)
-    malware_test_loader = DataLoader(malware_test_dataset, batch_size=batch_size, shuffle=False, num_workers=54)
+    benign_test_loader = DataLoader(benign_test_dataset, batch_size=batch_size, 
+                                    shuffle=False, num_workers=args.num_workers)
+    malware_test_loader = DataLoader(malware_test_dataset, batch_size=batch_size, 
+                                     shuffle=False, num_workers=args.num_workers)
     
     
     logger.info(f"|Benign test data size is {len(X_benign_test)}\n| Malware test data size is {len(X_malware_test)}\n| Subset data size is {len(X_subset_trojaned)}")
@@ -490,7 +494,7 @@ def load_apg_data_loaders(parent_path, batch_size=216, ft_size=0.05):
     
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    ft_loader = DataLoader(ft_dataset, batch_size=batch_size, shuffle=False)
+    ft_loader = DataLoader(ft_dataset, batch_size=batch_size, shuffle=True)
     
     logger.info(f"| Training data size is {len(X_train)}\n| Validation data size is {len(X_test)}\n| Ft data size is {len(X_ft)}")
     

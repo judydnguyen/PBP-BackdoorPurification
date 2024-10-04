@@ -188,7 +188,8 @@ def main():
     args.dataset_path = f"{args.dataset_path}/{args.dataset}"
     
     # ------------ Loading a pre-trained (backdoored) model -------------- #
-    device = torch.device(args.device if torch.cuda.is_available() else "cpu")
+    # device = torch.device(args.device if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     file_to_load = f"tgt_{args.target_label}_epochs_{args.epochs}_ft_size_{args.ft_size}_lr_{args.lr}_poison_rate_{round(args.poison_rate, 4)}"
     file_to_load = f'{args.folder_path}/backdoor/{file_to_load}.pth'
     
@@ -203,7 +204,7 @@ def main():
                                                 ft_size=args.ft_size,
                                                 batch_size=args.batch_size, 
                                                 test_batch_size=args.test_batch_size,
-                                                num_workers=56, val_size=0,
+                                                num_workers=args.num_workers, val_size=0,
                                                 poison_rate=args.poison_rate,
                                                 dataset=args.dataset)
 
@@ -234,7 +235,7 @@ def main():
     ori_net = copy.deepcopy(net)
     ori_net.eval()
     
-    backdoor_test_dl = get_em_bd_loader(net, X_test_loaded, y_test_loaded)
+    backdoor_test_dl = get_em_bd_loader(net, X_test_loaded, y_test_loaded, device)
 
     # print("\n--------Normal Testing --------- ")
     loss_c, acc_c = test(net, test_dl, device)
@@ -259,8 +260,9 @@ def main():
 
     # ---------- Start Fine-tuning ---------- #
     logging_path = f'{args.log_dir}/target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}'
-    # ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
-    ft_modes = ['ft-init']
+    ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
+    # ft_modes = ['ft-init']
+    # ft_modes = ['ft-init', 'proposal']
     ft_results = {}
 
     for ft_mode in ft_modes:
