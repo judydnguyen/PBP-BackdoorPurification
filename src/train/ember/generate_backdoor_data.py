@@ -111,7 +111,7 @@ def generate_backdoor_data(model, device):
     
     backdoored_X, backdoored_y = torch.from_numpy(X_train_watermarked), torch.from_numpy(y_train_watermarked)
     backdoored_dataset = TensorDataset(backdoored_X, backdoored_y)
-    backdoored_loader = DataLoader(backdoored_dataset, batch_size=512, shuffle=True, num_workers=54)
+    backdoored_loader = DataLoader(backdoored_dataset, batch_size=512, shuffle=True, num_workers=16)
     return backdoored_loader
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

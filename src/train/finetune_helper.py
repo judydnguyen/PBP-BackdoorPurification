@@ -63,7 +63,7 @@ def add_args(parser):
         "steplr_stepsize": 1,
         "steplr_gamma": 0.9,
         "adaptive": False,
-        "num_workers": 54,
+        "num_workers": 16,
     }
     
     # Update default arguments with values from config file
