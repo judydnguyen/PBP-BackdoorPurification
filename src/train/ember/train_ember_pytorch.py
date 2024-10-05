@@ -88,6 +88,7 @@ def get_args():
     config['target_label'] = int(config.get('target_label', TARGET_LABEL))
     config['num_poison'] = int(config.get('num_poison', 4))
     config['subset_family'] = "kyugo"
+    config['num_workers'] = 16
 
     return argparse.Namespace(**config)
 
@@ -248,6 +249,7 @@ if __name__ == "__main__":
     convs_sizes = [2, 8, 32]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device as: {device}")
     
     parent_p = "datasets/ember"
     pre_split_dataset_ember(args.datapath, args.ft_size, SEED, parent_p)

@@ -88,7 +88,7 @@ def get_args():
     config['is_backdoor'] = config.get('is_backdoor') == 1
     config['target_label'] = int(config.get('target_label', TARGET_LABEL))
     config['num_poison'] = int(config.get('num_poison', 4))
-    config['num_workers'] = int(config.get('num_workers', 54))
+    config['num_workers'] = int(config.get('num_workers', 16))
 
     return argparse.Namespace(**config)
 

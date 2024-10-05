@@ -97,7 +97,7 @@ def finetune(net, optimizer, criterion,
     if ft_mode == 'proposal':
         logger.info("Adding noise to the model")
         # net = add_masked_noise(net, device, stddev=0.2, mask=vectorized_noise_mask)
-        net = add_noise_w(net, device, stddev=0.3)
+        net = add_noise_w(net, device, stddev=0.25)
         
     prev_model = copy.deepcopy(net)
     

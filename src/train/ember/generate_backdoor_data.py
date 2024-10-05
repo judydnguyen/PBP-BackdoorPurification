@@ -135,7 +135,7 @@ if __name__ == "__main__":
                                                 ft_size=args.ft_size,
                                                 batch_size=args.batch_size, 
                                                 test_batch_size=args.test_batch_size,
-                                                num_workers=56, val_size=0,
+                                                num_workers=16, val_size=0,
                                                 poison_rate=args.poison_rate,
                                                 dataset=args.dataset)
     

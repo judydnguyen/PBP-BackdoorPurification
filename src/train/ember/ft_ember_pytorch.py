@@ -85,7 +85,7 @@ def finetune(net, optimizer, criterion,
 
     
     if ft_mode == 'proposal':
-        net = add_noise_w(net, device, stddev=1.0)
+        net = add_noise_w(net, device, stddev=0.5)
     prev_model = copy.deepcopy(net)
     
     for epoch in tqdm(range(f_epochs), desc=f'Fine-tuning mode: {ft_mode}'):
@@ -188,8 +188,8 @@ def main():
     args.dataset_path = f"{args.dataset_path}/{args.dataset}"
     
     # ------------ Loading a pre-trained (backdoored) model -------------- #
-    # device = torch.device(args.device if torch.cuda.is_available() else "cpu")
-    device = torch.device("cpu")
+    device = torch.device(args.device if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
     file_to_load = f"tgt_{args.target_label}_epochs_{args.epochs}_ft_size_{args.ft_size}_lr_{args.lr}_poison_rate_{round(args.poison_rate, 4)}"
     file_to_load = f'{args.folder_path}/backdoor/{file_to_load}.pth'
     
