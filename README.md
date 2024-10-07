@@ -1,4 +1,10 @@
 ## PBP: Post-training Backdoor Purification for Malware Classification
+This work is under Major Revision, and we plan to conduct additional analysis and discussion regarding to:
+- Ablation study of effectiveness of components of PBP
+- Neuron Mask Generation procedure and Quantify the number of neural networks (NNs) that could potentially be purified
+- Discussion about the assumption of fine-tuning the dataset and defender knowledge
+- Detailed analysis of experimental results and potential broader applications
+*The proposed modifications do not affect the claims and experiments in our submitted artifacts.*
 
 ### Dataset Preparation
 **EMBER-v1 dataset**
