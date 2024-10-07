@@ -64,6 +64,8 @@ def add_args(parser):
         "steplr_gamma": 0.9,
         "adaptive": False,
         "num_workers": 16,
+        "overlapping_ratio": 0.0,
+        "custom_name": None,
     }
     
     # Update default arguments with values from config file

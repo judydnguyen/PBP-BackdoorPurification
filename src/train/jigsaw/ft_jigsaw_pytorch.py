@@ -89,10 +89,12 @@ def finetune(net, optimizer, criterion,
         net_cpy = copy.deepcopy(net)
         net_cpy.to(device)
         net_cpy.train()
-        optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.001)
+        # optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.001)
+        optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.0005)
         # optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.f_lr)
         # retrain_model(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=5, args=args)
-        reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=2)
+        reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, 
+                                                    optimizer_cp, device, f_epochs=2)
     
     if ft_mode == 'proposal':
         logger.info("Adding noise to the model")
@@ -309,9 +311,9 @@ def main():
 
     # ---------- Start Fine-tuning ---------- #
     logging_path = f'{args.log_dir}/fam_{args.subset_family}_target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}'
-    ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
+    # ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
     # ft_modes = ['ft']
-    # ft_modes = ['proposal']
+    ft_modes = ['proposal']
     ft_results = {}
     for ft_mode in ft_modes:
         ft_results[ft_mode] = {}
@@ -346,6 +348,8 @@ def main():
         ft_results[ft_mode]["adv_acc"] = acc_bd
         if args.save:
             model_save_path = f'{args.folder_path}/fam_{args.subset_family}_target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}/mode_{ft_mode}'
+            if args.custom_name is not None:
+                model_save_path = f'{args.folder_path}/mode_{ft_mode}/{args.custom_name}'
             os.makedirs(model_save_path, exist_ok=True)
             torch.save(ft_net.state_dict(), f'{model_save_path}/checkpoint.pt')
             # torch.save(ft_net.state_dict(), f'{model_save_path}/checkpoint.pt')
@@ -354,12 +358,12 @@ def main():
         # # --------- * Final Evaluation * --------- #
         
         # # --------- * **************** * --------- #
-        # final_eval_result = final_evaluate(ft_net, X_subset_trojan=X_subset_trojaned,
-        #                                 X_test_remain_mal_trojan=X_test_remain_mal,
-        #                                 X_test=X_test, y_test=y_test, 
-        #                                 X_test_benign_trojan=X_test_benign, 
-        #                                 subset_family=args.subset_family, 
-        #                                 troj_type="Subset", log_path=model_save_path)
+        final_eval_result = final_evaluate(ft_net, X_subset_trojan=X_subset_trojaned,
+                                        X_test_remain_mal_trojan=X_test_remain_mal,
+                                        X_test=X_test, y_test=y_test, 
+                                        X_test_benign_trojan=X_test_benign, 
+                                        subset_family=args.subset_family, 
+                                        troj_type="Subset", log_path=model_save_path)
 
     end_time = datetime.datetime.now()
     # Print table

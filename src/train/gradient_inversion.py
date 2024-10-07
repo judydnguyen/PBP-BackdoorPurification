@@ -109,11 +109,13 @@ def reverse_net(net, dataloader, test_loader, bd_loader, optimizer, device, f_ep
     bn_stats = get_bn_stats(ori_net)
     criterion = nn.BCEWithLogitsLoss()
     net = init_noise(net, device, stddev=0.5)
+    net.to(device)
     net.train()
     prev_model = copy.deepcopy(net)
     
     for epoch in tqdm(range(f_epochs), desc=f'Reversing-model: '):
         # bn_stats = get_bn_stats(net)
+        # import IPython; IPython.embed()
         for batch_idx, (x, labels) in tqdm(enumerate(dataloader), desc=f'Epoch [{epoch + 1}/{f_epochs}]: '):
             optimizer.zero_grad()
             bn_hooks = []

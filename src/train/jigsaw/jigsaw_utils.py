@@ -354,6 +354,58 @@ def pre_split_apg_datasets(args, config, parent_path, MODELS_FOLDER, ft_size=0.0
     
     return X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal
 
+import torch
+import numpy as np
+from torch.utils.data import DataLoader, Subset
+
+def customize_finetune_subloader(train_loader, ft_loader, overlapping_ratio=0.0):
+    train_set = train_loader.dataset
+    ft_set = ft_loader.dataset
+    
+    total_samples_ft = len(ft_set)
+    reused_samples_cnt = int(total_samples_ft * overlapping_ratio)
+    new_samples_cnt = total_samples_ft - reused_samples_cnt
+
+    # Reuse some samples from the training set
+    # selecting random indices from the training set
+    # reused_indices = np.random.choice(len(train_set), reused_samples_cnt, replace=False).tolist()
+    reused_indices = list(range(reused_samples_cnt))
+
+    # remove the same amount of samples from the fine-tuning set
+    new_indices = list(range(new_samples_cnt))
+    
+    # Create subsets for reused and new samples
+    reused_subset = Subset(train_set, reused_indices)
+    new_subset = Subset(ft_set, new_indices)
+
+    # Combine the subsets
+    combined_dataset = torch.utils.data.ConcatDataset([reused_subset, new_subset])
+
+    # Create a new DataLoader (subloader) from the combined dataset
+    ft_subloader = DataLoader(combined_dataset, batch_size=ft_loader.batch_size, 
+                              shuffle=True, num_workers=ft_loader.num_workers)
+
+    return ft_subloader
+
+def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0):
+    # class_ratio = total_positive_samples / total_negative_samples
+    # get current ratio of the fine-tuning set
+    ft_set = ft_loader.dataset
+    total_samples_ft = len(ft_set)
+    
+    # count the number of positive and negative samples in the fine-tuning set
+    y_ft = ft_set.tensors[1].numpy()
+    total_positive_samples = np.sum(y_ft)
+
+    print(colored(f"Total samples in fine-tuning set: {total_samples_ft}", "blue"))
+    print(colored(f"Total positive samples in fine-tuning set: {total_positive_samples}", "blue"))
+    print(colored(f"Class ratio in fine-tuning set: {total_positive_samples / total_samples_ft}", "blue"))
+
+    # calculate the number of negative samples needed to match the class ratio
+    total_negative_samples = int(total_positive_samples / class_ratio)
+
+    pass
+
 def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05, subset_family="youmi"):
     # pre_split_datasets(args, config, parent_path, MODELS_FOLDER, ft_size=ft_size)
     train_data = np.load(f'{parent_path}/train_data_{ft_size}_fam_{subset_family}.npz')
@@ -368,8 +420,8 @@ def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05
     
     train_loader, testloader_benign, testloader_mal, X_subset_trojaned = get_subset_jigsaw_loaders(args, X_train, y_train, X_test, y_test, X_subset)
     
-    # X_train_torch = torch.tensor(X_train, dtype=torch.float32)
-    # y_train_torch = torch.tensor(y_train, dtype=torch.float32)
+    X_train_torch = torch.tensor(X_train, dtype=torch.float32)
+    y_train_torch = torch.tensor(y_train, dtype=torch.float32)
     
     X_ft_torch = torch.tensor(X_ft, dtype=torch.float32)
     y_ft_torch = torch.tensor(y_ft, dtype=torch.float32)
@@ -380,13 +432,19 @@ def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05
     # train_dataset = TensorDataset(X_train_torch, y_train_torch)
     test_dataset = TensorDataset(X_test_torch, y_test_torch)
     ft_dataset = TensorDataset(X_ft_torch, y_ft_torch)
+    tr_dataset = TensorDataset(X_train_torch, y_train_torch)
     
     # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, 
                              shuffle=False, num_workers=args.num_workers)
     ft_loader = DataLoader(ft_dataset, batch_size=batch_size, 
                            shuffle=True, num_workers=args.num_workers)
+    tr_loader = DataLoader(tr_dataset, batch_size=batch_size, shuffle=True,
+                           num_workers=args.num_workers)
     
+    if args.overlapping_ratio > 0:
+        ft_loader = customize_finetune_subloader(tr_loader, ft_loader, args.overlapping_ratio)
+        
     logger.info(f"| Training data size is {len(X_train)}\n| Validation data size is {len(X_test)}\n| Ft data size is {len(X_ft)}")
     
     return train_loader, test_loader, ft_loader, testloader_mal, X_subset_trojaned
