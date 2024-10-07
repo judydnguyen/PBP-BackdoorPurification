@@ -4,6 +4,7 @@ This work is under Major Revision, and we plan to conduct additional analysis an
 - Neuron Mask Generation procedure and Quantify the number of neural networks (NNs) that could potentially be purified
 - Discussion about the assumption of fine-tuning the dataset and defender knowledge
 - Detailed analysis of experimental results and potential broader applications
+  
 *The proposed modifications do not affect the claims and experiments in our submitted artifacts.*
 
 ### Dataset Preparation
