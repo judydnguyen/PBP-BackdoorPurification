@@ -65,6 +65,7 @@ def add_args(parser):
         "adaptive": False,
         "num_workers": 16,
         "overlapping_ratio": 0.0,
+        "class_ratio": None,
         "custom_name": None,
     }
     
