@@ -255,9 +255,10 @@ def main():
 
     POISONED_MODELS_FOLDER = os.path.join('models', POSTFIX)
     
-    X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal = pre_split_apg_datasets(args, bd_config, parent_p, POISONED_MODELS_FOLDER, args.ft_size, seed=SEED)
+    X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal, X_train_fam, X_ft_fam = pre_split_apg_datasets(args, bd_config, parent_p, POISONED_MODELS_FOLDER, args.ft_size, seed=SEED)
     train_dl, test_dl, ft_loader, testloader_mal, X_subset_trojaned = load_apg_subset_data_loaders(args, parent_p, batch_size=args.batch_size, 
-                                                                                ft_size=args.ft_size, subset_family=args.subset_family)
+                                                                                ft_size=args.ft_size, subset_family=args.subset_family, 
+                                                                                X_train_fam=X_train_fam, X_ft_fam=X_ft_fam)
     # backdoor_test_dl = get_backdoor_loader(DESTPATH)
 
     ### 3. get model

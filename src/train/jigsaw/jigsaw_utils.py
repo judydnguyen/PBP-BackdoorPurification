@@ -164,6 +164,108 @@ def load_features(X_filename, y_filename, meta_filename, save_folder, file_type=
     logger.info(f'y_train: {y_train.shape}, y_test: {y_test.shape}')
     return X_train, X_test, y_train, y_test, m_train, m_test, vec, train_test_random_state, train_idxs, test_idxs
 
+# def load_extracted_data(y_filename, sha_family_file, subset_family):
+#     train_filename = "datasets/apg/X_train_extracted.npz"
+#     test_filename = "datasets/apg/X_test_extracted.npz"
+
+#     train_data = np.load(train_filename)
+#     test_data = np.load(test_filename)
+#     X_train, y_train = train_data['X'], train_data['y']
+#     X_test, y_test = test_data['X'], test_data['y']
+    
+#     ''' find subset index in the whole dataset'''
+#     # sha_family_file = f'data/{dataset}/apg_sha_family.csv' # aligned with apg-X.json, apg-y.json, apg-meta.json
+#     df = pd.read_csv(sha_family_file, header=0)
+#     subset_idx_array = df[df.family == subset_family].index.to_numpy()
+#     logger.info(f'subset size: {len(subset_idx_array)}')
+    
+#     with open(y_filename, 'rt') as f:
+#         y = json.load(f)
+#     train_idxs, test_idxs = train_test_split(range(X_train.shape[0] + X_test.shape[0]),
+#                                              stratify=y, # to keep the same benign VS mal ratio in training and testing
+#                                              test_size=0.33,
+#                                              random_state=137)
+#     ''' find subest corresponding index in both training and testing set '''
+#     subset_train_idxs, subset_test_idxs = [], []
+#     for subset_idx in subset_idx_array:
+#         try:
+#             idx = train_idxs.index(subset_idx)
+#             subset_train_idxs.append(idx)
+#         except:
+#             idx = test_idxs.index(subset_idx)
+#             subset_test_idxs.append(idx)
+#     ''' reorganize training, testing, subset, remain_mal'''
+#     X_subset = np.vstack((X_train[subset_train_idxs], X_test[subset_test_idxs]))
+#     logger.info(f'X_subset: {X_subset.shape}, type: {type(X_subset)}')
+
+#     train_left_idxs = [idx for idx in range(X_train.shape[0]) if idx not in subset_train_idxs]
+#     test_left_idxs = [idx for idx in range(X_test.shape[0]) if idx not in subset_test_idxs]
+
+#     X_train = X_train[train_left_idxs]
+#     y_train = y_train[train_left_idxs]
+
+#     X_test = X_test[test_left_idxs]
+#     y_test = y_test[test_left_idxs]
+    
+#     logger.debug(f'X_train: {X_train.shape}')
+
+#     benign_train_idx = np.where(y_train == 0)[0]
+#     X_train_benign = X_train[benign_train_idx]
+#     logger.debug(f'X_train_benign: {X_train_benign.shape}')
+
+#     remain_mal_train_idx = np.where(y_train == 1)[0]
+#     X_train_remain_mal = X_train[remain_mal_train_idx]
+#     logger.debug(f'X_train_remain_mal: {X_train_remain_mal.shape}')
+
+#     remain_mal_test_idx = np.where(y_test == 1)[0]
+#     X_test_remain_mal = X_test[remain_mal_test_idx]
+
+#     ''' remove duplicate feature vectors between X_subset and X_train_remain_mal'''
+#     X_train_remain_mal_arr = X_train_remain_mal
+#     X_subset_arr = X_subset
+    
+#     # Convert X_subset_arr to a set of tuples for faster lookup
+#     X_subset_set = {tuple(x) for x in X_subset_arr}
+#     remove_idx_list = []
+#     # Use a list comprehension with enumerate to find matching indices
+#     remove_idx_list.extend(
+#         idx for idx, x2 in enumerate(X_train_remain_mal_arr)
+#         if tuple(x2) in X_subset_set
+#     )
+#     # remove_idx_list = []
+#     # for x1 in X_subset_arr:
+#     #     remove_idx_list.extend(
+#     #         idx
+#     #         for idx, x2 in enumerate(X_train_remain_mal_arr)
+#     #         if np.array_equal(x1, x2)
+#     #     )
+#     logger.info(f'removed duplicate feature vectors: {len(remove_idx_list)}')
+#     logger.info(f'removed duplicate feature vectors unique: {len(set(remove_idx_list))}')
+#     X_train_remain_mal_arr_new = np.delete(X_train_remain_mal_arr, remove_idx_list, axis=0)
+#     logger.info(f'X_train_remain_mal_arr_new: {X_train_remain_mal_arr_new.shape}')
+#     # X_train_remain_mal_sparse = sparse.csr_matrix(X_train_remain_mal_arr_new)
+
+#     X_train = np.vstack((X_train_benign, X_train_remain_mal_arr_new))
+#     y_train = np.hstack(([0] * X_train_benign.shape[0], [1] * X_train_remain_mal_arr_new.shape[0]))
+#     y_train = np.array(y_train, dtype=np.int64)
+
+#     del X_subset_arr, X_train_remain_mal_arr, X_train_remain_mal_arr_new, X_train_benign
+
+#     benign_test_idx = np.where(y_test == 0)[0]
+#     X_test_benign = X_test[benign_test_idx]
+#     logger.info(f'y_test: {Counter(y_test)}')
+    
+#     logger.info(f'X_test_benign: {X_test_benign.shape}, type: {type(X_test_benign)}')
+#     logger.info(f'X_train_remain_mal: {X_train_remain_mal.shape}, type: {type(X_train_remain_mal)}')
+#     # logger.info(f'X_train_remain_mal_sparse: {X_train_remain_mal_sparse.shape}, type: {type(X_train_remain_mal_sparse)}')
+#     logger.info(f'X_test_remain_mal: {X_test_remain_mal.shape}, type: {type(X_test_remain_mal)}')
+
+#     logger.info(f'After removing subset, X_train: {X_train.shape}, X_test: {X_test.shape}')
+#     logger.info(f'After removing subset, y_train: {y_train.shape}, y_test: {y_test.shape}')
+#     logger.info(f'y_train: {Counter(y_train)}, y_test: {Counter(y_test)}')
+
+#     return X_train, X_test, y_train, y_test, X_subset, X_test_benign, X_test_remain_mal
+
 def load_extracted_data(y_filename, sha_family_file, subset_family):
     train_filename = "datasets/apg/X_train_extracted.npz"
     test_filename = "datasets/apg/X_test_extracted.npz"
@@ -176,6 +278,7 @@ def load_extracted_data(y_filename, sha_family_file, subset_family):
     ''' find subset index in the whole dataset'''
     # sha_family_file = f'data/{dataset}/apg_sha_family.csv' # aligned with apg-X.json, apg-y.json, apg-meta.json
     df = pd.read_csv(sha_family_file, header=0)
+    
     subset_idx_array = df[df.family == subset_family].index.to_numpy()
     logger.info(f'subset size: {len(subset_idx_array)}')
     
@@ -185,6 +288,9 @@ def load_extracted_data(y_filename, sha_family_file, subset_family):
                                              stratify=y, # to keep the same benign VS mal ratio in training and testing
                                              test_size=0.33,
                                              random_state=137)
+    
+    train_families = df.loc[train_idxs].family.to_numpy()
+    
     ''' find subest corresponding index in both training and testing set '''
     subset_train_idxs, subset_test_idxs = [], []
     for subset_idx in subset_idx_array:
@@ -201,20 +307,24 @@ def load_extracted_data(y_filename, sha_family_file, subset_family):
     train_left_idxs = [idx for idx in range(X_train.shape[0]) if idx not in subset_train_idxs]
     test_left_idxs = [idx for idx in range(X_test.shape[0]) if idx not in subset_test_idxs]
 
+    X_train_left_family = train_families[train_left_idxs]
     X_train = X_train[train_left_idxs]
     y_train = y_train[train_left_idxs]
 
     X_test = X_test[test_left_idxs]
     y_test = y_test[test_left_idxs]
     
+    # import IPython; IPython.embed()
     logger.debug(f'X_train: {X_train.shape}')
 
     benign_train_idx = np.where(y_train == 0)[0]
     X_train_benign = X_train[benign_train_idx]
     logger.debug(f'X_train_benign: {X_train_benign.shape}')
+    X_train_benign_fam = X_train_left_family[benign_train_idx]
 
     remain_mal_train_idx = np.where(y_train == 1)[0]
     X_train_remain_mal = X_train[remain_mal_train_idx]
+    X_train_remain_mal_fam = X_train_left_family[remain_mal_train_idx]
     logger.debug(f'X_train_remain_mal: {X_train_remain_mal.shape}')
 
     remain_mal_test_idx = np.where(y_test == 1)[0]
@@ -222,6 +332,7 @@ def load_extracted_data(y_filename, sha_family_file, subset_family):
 
     ''' remove duplicate feature vectors between X_subset and X_train_remain_mal'''
     X_train_remain_mal_arr = X_train_remain_mal
+    
     X_subset_arr = X_subset
     
     # Convert X_subset_arr to a set of tuples for faster lookup
@@ -242,10 +353,14 @@ def load_extracted_data(y_filename, sha_family_file, subset_family):
     logger.info(f'removed duplicate feature vectors: {len(remove_idx_list)}')
     logger.info(f'removed duplicate feature vectors unique: {len(set(remove_idx_list))}')
     X_train_remain_mal_arr_new = np.delete(X_train_remain_mal_arr, remove_idx_list, axis=0)
+    X_train_remain_mal_fam = np.delete(X_train_remain_mal_fam, remove_idx_list, axis=0)
+    
     logger.info(f'X_train_remain_mal_arr_new: {X_train_remain_mal_arr_new.shape}')
     # X_train_remain_mal_sparse = sparse.csr_matrix(X_train_remain_mal_arr_new)
 
     X_train = np.vstack((X_train_benign, X_train_remain_mal_arr_new))
+    X_train_fam = np.hstack((X_train_benign_fam, X_train_remain_mal_fam))
+    # import IPython; IPython.embed()
     y_train = np.hstack(([0] * X_train_benign.shape[0], [1] * X_train_remain_mal_arr_new.shape[0]))
     y_train = np.array(y_train, dtype=np.int64)
 
@@ -264,7 +379,7 @@ def load_extracted_data(y_filename, sha_family_file, subset_family):
     logger.info(f'After removing subset, y_train: {y_train.shape}, y_test: {y_test.shape}')
     logger.info(f'y_train: {Counter(y_train)}, y_test: {Counter(y_test)}')
 
-    return X_train, X_test, y_train, y_test, X_subset, X_test_benign, X_test_remain_mal
+    return X_train, X_test, y_train, y_test, X_subset, X_test_benign, X_test_remain_mal, X_train_fam
 
 def vectorize(X, y):
     vec = DictVectorizer(sparse=True) # default is True, will generate sparse matrix
@@ -303,7 +418,7 @@ def pre_split_apg_datasets(args, config, parent_path, MODELS_FOLDER, ft_size=0.0
     #                                                                     file_type='json', svm_c=1, max_iter=1, 
     #                                                                     num_features=args.n_features, seed=seed)
     sha_family_file = f'{parent_path}/apg_sha_family.csv'
-    X_train_all, X_test, y_train_all, y_test, X_subset, X_test_benign, X_test_remain_mal = load_extracted_data(y_filename=config['y_dataset'], sha_family_file=sha_family_file, 
+    X_train_all, X_test, y_train_all, y_test, X_subset, X_test_benign, X_test_remain_mal, X_train_left_family = load_extracted_data(y_filename=config['y_dataset'], sha_family_file=sha_family_file, 
                                                                              subset_family=args.subset_family)
    
     X_train_all = X_train_all
@@ -339,6 +454,11 @@ def pre_split_apg_datasets(args, config, parent_path, MODELS_FOLDER, ft_size=0.0
         stratify=stratify_labels[train_ft_indices],
         random_state=seed
     )
+    
+    # statistic the family among training and testing set
+    X_train_fam = X_train_left_family[train_indices]
+    X_ft_fam = X_train_left_family[ft_indices]
+    
     logger.info(f"| Training data size is {len(train_indices)}\n| Validation data size is {len(y_test)}\n| Ft data size is {len(ft_indices)}\nSubset size is: {len(X_subset)}")
     
     X_train, y_train = X_train_all[train_indices], y_train_all[train_indices]
@@ -346,13 +466,14 @@ def pre_split_apg_datasets(args, config, parent_path, MODELS_FOLDER, ft_size=0.0
     
     if os.path.exists(f'{parent_path}/train_data_{ft_size}_fam_{args.subset_family}.npz'):
         logger.info(colored(f"Data already pre-split for ft_size={ft_size}", "blue"))
-        return X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal
+        return X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal, X_train_fam, X_ft_fam
+    
     np.savez(f'{parent_path}/train_data_{ft_size}_fam_{args.subset_family}.npz', X=X_train, y=y_train)
     np.savez(f'{parent_path}/val_data_{ft_size}_fam_{args.subset_family}.npz', X=X_test, y=y_test)
     np.savez(f'{parent_path}/ft_data_{ft_size}_fam_{args.subset_family}.npz', X=X_ft, y=y_ft)
     np.savez(f'{parent_path}/subset_data_{ft_size}_fam_{args.subset_family}.npz', X=X_subset, y=y_subset)
     
-    return X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal
+    return X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal, X_train_fam, X_ft_fam
 
 import torch
 import numpy as np
@@ -515,8 +636,77 @@ def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0):
     print(colored(f"Class ratio in balanced fine-tuning set: {new_ratio}", "yellow"))
     return balanced_ft_loader
 
+def customize_family_ratio(X_train, y_train, X_ft, y_ft, X_train_fam, X_ft_fam, 
+                           family_ratio=0, ratio=0.1):
+    # Get current statistics of the family distribution
+    # Get unique family in the training set and counts
+    # replace nan with 'NA'
+    X_train_fam = np.where(pd.isnull(X_train_fam), 'NA', X_train_fam)
+    X_ft_fam = np.where(pd.isnull(X_ft_fam), 'NA', X_ft_fam)
 
-def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05, subset_family="youmi"):
+    train_fam, train_fam_count = np.unique(X_train_fam, return_counts=True)
+    ft_fam, ft_fam_count = np.unique(X_ft_fam, return_counts=True)
+    
+    # import IPython; IPython.embed()
+    total_fam_train = len(train_fam)
+    total_fam_ft = len(ft_fam)
+    
+    print(colored(f"Current ratio of classes in ft set compared to train set: {total_fam_ft/total_fam_train}", "red"))
+    
+    required_ft_fam_cnt = int(total_fam_train * family_ratio)
+    print(f"Required family count in ft set: {required_ft_fam_cnt}")
+    
+    # calculate missing family count
+    missing_fam = required_ft_fam_cnt - total_fam_ft
+    
+    if missing_fam <= 0:
+        print(colored("No need to add more families!", "blue"))
+        print(colored("Start removing!", "blue"))
+        # return X_ft, y_ft
+        remaining_fam = np.random.choice(ft_fam, required_ft_fam_cnt, replace=False)
+        remaining_indices = np.where(np.isin(X_ft_fam, remaining_fam))[0]
+        X_ft = X_ft[remaining_indices]
+        y_ft = y_ft[remaining_indices]
+        
+        # recalculate the family count
+        ft_fam, ft_fam_count = np.unique(X_ft_fam[remaining_indices], return_counts=True)
+        total_fam_ft = len(ft_fam)  
+        print(colored(f"Final ratio of classes in ft set compared to train set: {total_fam_ft/total_fam_train}", "red"))
+        
+    else:
+        # get non-overlap indices between ft set and train set
+        overlap_indices = np.where(np.isin(ft_fam, train_fam))[0]
+        non_overlap_indices = np.where(~np.isin(ft_fam, train_fam))[0]
+        
+        # get needed non-overlap indices
+        needed_non_overlap_indices = non_overlap_indices[:missing_fam]
+        added_X = []
+        added_y = []
+        # import IPython; IPython.embed()
+        for idx in needed_non_overlap_indices:
+            # find the corresponding samples in the training set
+            # fam_samples = np.where(X_train_fam == X_ft_fam[idx])[0]
+            fam_samples = np.where(X_train_fam == idx)[0]
+            # randomly select a sample from the training set
+            selected_samples = np.random.choice(fam_samples, ratio*len(fam_samples), replace=False)
+            added_X.append(copy.deepcopy(X_train[selected_samples]))
+            added_y.append(copy.deepcopy(y_train[selected_samples]))
+
+            # calulate the added family count
+            # added_fam, added_fam_count = np.unique(X_ft_fam, return_counts=True)
+            # print(colored(f"Added family count: {len(added_fam)}", "blue"))
+            
+        added_X = np.vstack(added_X)
+        added_y = np.hstack(added_y)
+        
+        # concatenate the added samples to the fine-tuning set
+        X_ft = np.vstack((X_ft, added_X))
+        y_ft = np.hstack((y_ft, added_y))
+
+    return X_ft, y_ft
+        
+def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05, subset_family="youmi", 
+                                 X_train_fam=[], X_ft_fam=[]):
     # pre_split_datasets(args, config, parent_path, MODELS_FOLDER, ft_size=ft_size)
     train_data = np.load(f'{parent_path}/train_data_{ft_size}_fam_{subset_family}.npz')
     val_data = np.load(f'{parent_path}/val_data_{ft_size}_fam_{subset_family}.npz')
@@ -529,7 +719,10 @@ def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05
     X_subset, _ = subset_data['X'], subset_data['y']
     
     train_loader, testloader_benign, testloader_mal, X_subset_trojaned = get_subset_jigsaw_loaders(args, X_train, y_train, X_test, y_test, X_subset)
-    
+
+    if args.family_ratio is not None:
+        X_ft, y_ft = customize_family_ratio(X_train, y_train, X_ft, y_ft, X_train_fam, X_ft_fam, args.family_ratio)
+        
     X_train_torch = torch.tensor(X_train, dtype=torch.float32)
     y_train_torch = torch.tensor(y_train, dtype=torch.float32)
     
@@ -558,6 +751,7 @@ def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05
     if args.class_ratio is not None:
         ft_loader = customize_class_ratio(tr_loader, ft_loader, args.class_ratio)
 
+        
     logger.info(f"| Training data size is {len(X_train)}\n| Validation data size is {len(X_test)}\n| Ft data size is {len(X_ft)}")
     
     return train_loader, test_loader, ft_loader, testloader_mal, X_subset_trojaned

@@ -67,6 +67,7 @@ def add_args(parser):
         "overlapping_ratio": 0.0,
         "class_ratio": None,
         "custom_name": None,
+        "family_ratio": None,
     }
     
     # Update default arguments with values from config file
