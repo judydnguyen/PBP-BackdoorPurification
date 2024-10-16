@@ -23,6 +23,7 @@ import torch
 from torch.utils.data import DataLoader, Subset, TensorDataset, Dataset
 
 DATAPATH = "datasets"
+SEED = 12
 sys.path.append('../')
 from jigsaw.apg_backdoor_helper import APGNew, BackdoorDataset, get_mask, get_problem_space_final_mask, random_troj_setting, troj_gen_func, troj_gen_func_set
 from jigsaw.jigsaw_attack import add_trojan_to_full_testing, decide_which_part_feature_to_perturb, generate_trojaned_benign_data, generate_trojaned_benign_sparse
@@ -487,7 +488,9 @@ def get_labels_from_subset(subset):
         labels.append(label)
     return np.array(labels)
 
-def customize_finetune_subloader(train_loader, ft_loader, overlapping_ratio=0.0):
+def customize_finetune_subloader(train_loader, ft_loader, 
+                                 overlapping_ratio=0.0, 
+                                 dataset="apg"):
     train_set = train_loader.dataset
     ft_set = ft_loader.dataset
     
@@ -495,28 +498,36 @@ def customize_finetune_subloader(train_loader, ft_loader, overlapping_ratio=0.0)
     reused_samples_cnt = int(total_samples_ft * overlapping_ratio)
     new_samples_cnt = total_samples_ft - reused_samples_cnt
 
+    logger.info(colored(f"Total samples in fine-tuning set: {total_samples_ft}\nnew_samples_cnt: {new_samples_cnt}\nreused_samples_cnt: {reused_samples_cnt}", "red"))
     # Reuse some samples from the training set
     # selecting random indices from the training set
     # reused_indices = np.random.choice(len(train_set), reused_samples_cnt, replace=False, ).tolist()
     # reused_indices = list(range(reused_samples_cnt))
 
     # Extract labels from train_set
-    labels = [label for _, label in train_set]  # Assuming train_set allows this access
-    labels = np.array(labels)
+    if dataset == "apg":
+        labels = [label for _, label in train_set]  # Assuming train_set allows this access
+        labels = np.array(labels)
+    elif dataset == "ember":
+        labels = [label.item() for _, label in train_set]
+        labels = np.array(labels)
 
     all_train_indices = list(range(len(train_set)))
     all_train_indices_shuffled = np.random.permutation(all_train_indices)
-    reused_indices = all_train_indices_shuffled[:reused_samples_cnt]
+    
+    # reused_indices = all_train_indices_shuffled[:reused_samples_cnt]
     # # Use train_test_split to get reused indices while maintaining class ratios
-    # _, reused_indices = train_test_split(
-    #     range(len(train_set)), 
-    #     train_size=reused_samples_cnt, 
-    #     stratify=labels, 
-    #     random_state=12
-    # )
+    
+    _, reused_indices = train_test_split(
+        range(len(train_set)), 
+        train_size=reused_samples_cnt, 
+        stratify=labels, 
+        random_state=12
+    )
     
     # remove the same amount of samples from the fine-tuning set
     new_indices = list(range(new_samples_cnt))
+    # import IPython; IPython.embed()
     
     # Create subsets for reused and new samples
     reused_subset = Subset(train_set, reused_indices)
@@ -525,27 +536,34 @@ def customize_finetune_subloader(train_loader, ft_loader, overlapping_ratio=0.0)
     # Combine the subsets
     combined_dataset = torch.utils.data.ConcatDataset([reused_subset, new_subset])
 
+    print(colored(f"Total samples in combined dataset: {len(combined_dataset)}", "blue"))
     # Create a new DataLoader (subloader) from the combined dataset
     ft_subloader = DataLoader(combined_dataset, batch_size=ft_loader.batch_size, 
                               shuffle=True, num_workers=ft_loader.num_workers)
 
     return ft_subloader
 
-def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0):
+def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0, dataset="apg"):
     # class_ratio = total_positive_samples / total_negative_samples
     # Get current ratio of the fine-tuning set
     ft_set = ft_loader.dataset
     total_samples_ft = len(ft_set)
     
-    # Count the number of positive and negative samples in the fine-tuning set
-    y_ft = ft_set.tensors[1].numpy()  # Assuming the labels are stored in the second tensor of the dataset
+    if dataset == "apg":
+        # Count the number of positive and negative samples in the fine-tuning set
+        y_ft = ft_set.tensors[1].numpy()  # Assuming the labels are stored in the second tensor of the dataset
+    elif dataset == "ember":
+        y_ft = [label.item() for _, label in ft_set]
+        y_ft = np.array(y_ft)
+        # y_ft = ft_set.tensors[1].numpy()
+        
     total_positive_samples = np.sum(y_ft)
     total_negative_samples = total_samples_ft - total_positive_samples
 
     current_ratio = total_positive_samples / total_negative_samples
-    print(colored(f"Total samples in fine-tuning set: {total_samples_ft}", "blue")) # 9823
-    print(colored(f"Total positive samples in fine-tuning set: {total_positive_samples}", "blue")) # 794
-    print(colored(f"Class ratio in fine-tuning set: {current_ratio}", "blue")) # 0.0879
+    logger.info(colored(f"Total samples in fine-tuning set: {total_samples_ft}", "blue")) # 9823
+    logger.info(colored(f"Total positive samples in fine-tuning set: {total_positive_samples}", "blue")) # 794
+    logger.info(colored(f"Class ratio in fine-tuning set: {current_ratio}", "blue")) # 0.0879
 
     # Calculate the new number of positive and negative samples to match the desired ratio
     desired_positive_samples = int((class_ratio / (1 + class_ratio)) * total_samples_ft)
@@ -556,6 +574,7 @@ def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0):
     positive_indices_ft = np.where(y_ft == 1)[0]
     negative_indices_ft = np.where(y_ft == 0)[0]
 
+    print(f"Original ratio in training set: {len(positive_indices_ft) / len(negative_indices_ft)}")
     # Sample the required number of positive and negative indices from the fine-tuning set
     selected_positive_indices = positive_indices_ft
     selected_negative_indices = negative_indices_ft
@@ -564,17 +583,27 @@ def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0):
     num_missing_positives = desired_positive_samples - len(positive_indices_ft)
     num_missing_negatives = desired_negative_samples - len(negative_indices_ft)
 
+    print(colored(f"Missing POS: {num_missing_positives}, NEG: {num_missing_negatives}", "blue"))
     # Get labels from the training set
     train_set = train_loader.dataset
-    y_train = train_set.tensors[1].numpy()  # Assuming labels are stored in the second tensor
-
+    if dataset == "apg":
+        y_train = train_set.tensors[1].numpy()  # Assuming labels are stored in the second tensor
+    elif dataset == "ember":
+        y_train = [label.item() for _, label in train_set]
+        y_train = np.array(y_train)
+        
     # Get the indices of the positive and negative samples in the training set
+    # import IPython; IPython.embed()
+    
     positive_indices_train = np.where(y_train == 1)[0]
     negative_indices_train = np.where(y_train == 0)[0]
 
     # shuffle the indices
-    np.random.shuffle(positive_indices_train)
-    np.random.shuffle(negative_indices_train)
+    # np.random.shuffle(positive_indices_train)
+    # np.random.shuffle(negative_indices_train)
+    
+    # np.random.shuffle(selected_positive_indices)
+    # np.random.shuffle(selected_negative_indices)
 
     selected_train_positive_indices, selected_train_negative_indices = [], []
     selected_ft_positive_indices, selected_ft_negative_indices = [], []
@@ -582,13 +611,13 @@ def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0):
     # Sample additional positive samples from the training set if needed
     if num_missing_positives > 0 and num_missing_negatives < 0:
         # selected_train_positive_indices = np.random.choice(positive_indices_train, num_missing_positives, replace=False).tolist()
-        selected_train_positive_indices = positive_indices_train[np.arange(desired_positive_samples).tolist()]
+        selected_train_positive_indices = positive_indices_train[np.arange(num_missing_positives).tolist()]
         selected_ft_positive_indices = selected_positive_indices
         selected_ft_negative_indices = selected_negative_indices[np.arange(desired_negative_samples).tolist()]
 
     elif num_missing_negatives > 0 and num_missing_positives < 0:
         # selected_train_negative_indices = np.random.choice(negative_indices_train, num_missing_negatives, replace=False).tolist()
-        selected_train_negative_indices = negative_indices_train[np.arange(desired_negative_samples).tolist()]
+        selected_train_negative_indices = negative_indices_train[np.arange(num_missing_negatives).tolist()]
         selected_ft_negative_indices = selected_negative_indices
         selected_ft_positive_indices = selected_positive_indices[np.arange(desired_positive_samples).tolist()]
     else:
@@ -631,9 +660,9 @@ def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0):
     total_positive_samples = np.sum(y_balanced)
     total_negative_samples = len(y_balanced) - total_positive_samples
     new_ratio = total_positive_samples / total_negative_samples
-    print(colored(f"Total samples in balanced fine-tuning set: {len(y_balanced)}", "yellow"))
-    print(colored(f"Total positive samples in balanced fine-tuning set: {total_positive_samples}", "yellow"))
-    print(colored(f"Class ratio in balanced fine-tuning set: {new_ratio}", "yellow"))
+    logger.info(colored(f"Total samples in balanced fine-tuning set: {len(y_balanced)}", "yellow"))
+    logger.info(colored(f"Total positive samples in balanced fine-tuning set: {total_positive_samples}", "yellow"))
+    logger.info(colored(f"Class ratio in balanced fine-tuning set: {new_ratio}", "yellow"))
     return balanced_ft_loader
 
 def customize_family_ratio(X_train, y_train, X_ft, y_ft, X_train_fam, X_ft_fam, 
@@ -752,11 +781,11 @@ def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05
     tr_loader = DataLoader(tr_dataset, batch_size=batch_size, shuffle=True,
                            num_workers=args.num_workers)
     
-    if args.overlapping_ratio > 0:
-        ft_loader = customize_finetune_subloader(tr_loader, ft_loader, args.overlapping_ratio)
+    if args.overlapping_ratio is not None:
+        ft_loader = customize_finetune_subloader(tr_loader, ft_loader, args.overlapping_ratio, args.dataset)
     
     if args.class_ratio is not None:
-        ft_loader = customize_class_ratio(tr_loader, ft_loader, args.class_ratio)
+        ft_loader = customize_class_ratio(tr_loader, ft_loader, args.class_ratio, args.dataset)
 
         
     logger.info(f"| Training data size is {len(X_train)}\n| Validation data size is {len(X_test)}\n| Ft data size is {len(X_ft)}")

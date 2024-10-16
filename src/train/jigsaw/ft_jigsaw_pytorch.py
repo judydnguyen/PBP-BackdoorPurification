@@ -352,6 +352,7 @@ def main():
         ft_results[ft_mode]["adv_acc"] = acc_bd
         if args.save:
             model_save_path = f'{args.folder_path}/fam_{args.subset_family}_target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}/mode_{ft_mode}'
+            
             if args.custom_name is not None:
                 model_save_path = f'{args.folder_path}/mode_{ft_mode}/{args.custom_name}'
             os.makedirs(model_save_path, exist_ok=True)

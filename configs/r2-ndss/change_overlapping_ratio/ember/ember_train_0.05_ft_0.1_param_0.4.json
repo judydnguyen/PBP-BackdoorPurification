@@ -10,7 +10,7 @@
     "linear_name": "dense4",
     "ft_mode": "proposal",
     "f_epochs": 10,
-    "f_lr": 0.0002,
+    "f_lr": 0.0001,
     "device": "cuda",
     "imsize": 64,
     "conv1": 32,
@@ -24,6 +24,6 @@
     "num_poison": 2,
     "poison_rate": 0.05,
     "ft_size": 0.1,
-    "custom_name": "class_ratio_0.07",
-    "class_ratio": 0.07
+    "custom_name": "overlapping_ratio_0.4",
+    "overlapping_ratio": 0.4
 }

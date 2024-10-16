@@ -80,7 +80,8 @@ def finetune(net, optimizer, criterion,
         net_cpy.to(device)
         
         net_cpy.train()
-        optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.002)
+        # optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.002)
+        optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.f_lr)
         reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=1)
 
     
@@ -206,7 +207,8 @@ def main():
                                                 test_batch_size=args.test_batch_size,
                                                 num_workers=args.num_workers, val_size=0,
                                                 poison_rate=args.poison_rate,
-                                                dataset=args.dataset)
+                                                dataset=args.dataset,
+                                                args=args)
 
     X_test_remain_mal, X_test_benign = separate_test_data(X_test_loaded, y_test_loaded)
     
@@ -260,9 +262,9 @@ def main():
 
     # ---------- Start Fine-tuning ---------- #
     logging_path = f'{args.log_dir}/target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}'
-    ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
+    # ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
     # ft_modes = ['ft-init']
-    # ft_modes = ['ft-init', 'proposal']
+    ft_modes = ['proposal']
     ft_results = {}
 
     for ft_mode in ft_modes:
@@ -292,6 +294,8 @@ def main():
         ft_results[ft_mode]["adv_acc"] = acc_bd
         args.save = True
         if args.save:
+            if args.custom_name is not None:
+                model_save_path = f'{args.folder_path}/mode_{ft_mode}/{args.custom_name}'
             os.makedirs(model_save_path, exist_ok=True)
             torch.save(ft_net.state_dict(), f'{model_save_path}/checkpoint.pt')
         
