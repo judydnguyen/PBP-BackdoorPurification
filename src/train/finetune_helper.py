@@ -68,6 +68,7 @@ def add_args(parser):
         "class_ratio": None,
         "custom_name": None,
         "family_ratio": None,
+        "reverse_lr": None,
     }
     
     # Update default arguments with values from config file

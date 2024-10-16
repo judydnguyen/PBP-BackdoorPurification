@@ -90,7 +90,10 @@ def finetune(net, optimizer, criterion,
         net_cpy.to(device)
         net_cpy.train()
         # optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.001)
-        optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.0005)
+        if args.reverse_lr is not None:
+            optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.reverse_lr)
+        else:
+            optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.001)
         # optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.f_lr)
         # retrain_model(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=5, args=args)
         reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, 

@@ -663,7 +663,12 @@ def customize_family_ratio(X_train, y_train, X_ft, y_ft, X_train_fam, X_ft_fam,
         print(colored("No need to add more families!", "blue"))
         print(colored("Start removing!", "blue"))
         # return X_ft, y_ft
+        # don't remove "NA" family
+        
         remaining_fam = np.random.choice(ft_fam, required_ft_fam_cnt, replace=False)
+        if 'NA' not in remaining_fam:
+            remaining_fam = np.append(remaining_fam, 'NA')
+            remaining_fam = remaining_fam[1:]
         remaining_indices = np.where(np.isin(X_ft_fam, remaining_fam))[0]
         X_ft = X_ft[remaining_indices]
         y_ft = y_ft[remaining_indices]
@@ -680,15 +685,16 @@ def customize_family_ratio(X_train, y_train, X_ft, y_ft, X_train_fam, X_ft_fam,
         
         # get needed non-overlap indices
         needed_non_overlap_indices = non_overlap_indices[:missing_fam]
+        
         added_X = []
         added_y = []
         # import IPython; IPython.embed()
         for idx in needed_non_overlap_indices:
             # find the corresponding samples in the training set
-            # fam_samples = np.where(X_train_fam == X_ft_fam[idx])[0]
-            fam_samples = np.where(X_train_fam == idx)[0]
+            fam_samples = np.where(X_train_fam == X_ft_fam[idx])[0]
+            # fam_samples = np.where(X_train_fam == idx)[0]
             # randomly select a sample from the training set
-            selected_samples = np.random.choice(fam_samples, ratio*len(fam_samples), replace=False)
+            selected_samples = np.random.choice(fam_samples, min(len(fam_samples), 10), replace=False)
             added_X.append(copy.deepcopy(X_train[selected_samples]))
             added_y.append(copy.deepcopy(y_train[selected_samples]))
 
@@ -702,7 +708,8 @@ def customize_family_ratio(X_train, y_train, X_ft, y_ft, X_train_fam, X_ft_fam,
         # concatenate the added samples to the fine-tuning set
         X_ft = np.vstack((X_ft, added_X))
         y_ft = np.hstack((y_ft, added_y))
-
+        
+    logger.info(colored(f"Final ft set size after customizing family distribution: {len(X_ft)}", "red"))
     return X_ft, y_ft
         
 def load_apg_subset_data_loaders(args, parent_path, batch_size=216, ft_size=0.05, subset_family="youmi", 

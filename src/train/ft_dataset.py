@@ -22,7 +22,7 @@ from attack_utils import get_backdoor_dl, get_poisoning_candidate_samples, water
 # from backdoor_helper import add_pixel_pattern
 from explainable_backdoor_utils import build_feature_names
 from jigsaw.apg_backdoor_helper import get_mask
-from jigsaw.jigsaw_utils import add_trojan
+from jigsaw.jigsaw_utils import add_trojan, customize_class_ratio, customize_finetune_subloader
 from models.embernn import EmberNN
 from utils import logger
 
@@ -413,7 +413,7 @@ def load_data_loaders(data_path, ft_size=0.05,
                       dataset="malimg",
                       target_label=0,
                       poison_rate=0.01,
-                      is_ft=False):
+                      is_ft=False, args=None):
     print(f"dataset: {dataset}")
     
     train_data = np.load(f'{data_path}/train_data_{ft_size}.npz')
@@ -507,6 +507,12 @@ def load_data_loaders(data_path, ft_size=0.05,
     ft_loader = DataLoader(ft_dataset, batch_size=batch_size, 
                               shuffle=True, num_workers=num_workers)
     
+    if args.overlapping_ratio > 0:
+        ft_loader = customize_finetune_subloader(train_loader, ft_loader, args.overlapping_ratio)
+    
+    if args.class_ratio is not None:
+        ft_loader = customize_class_ratio(train_loader, ft_loader, args.class_ratio)
+        
     logger.info(f"| Training data size is {len(X_train_loaded)}\n| Validation data size is {len(X_test_loaded)}\n| Ft data size is {len(X_ft_loaded)}")
     return train_loader, poison_train_loader, test_loader, ft_loader, backdoor_test_dl, X_test_loaded, y_test_loaded, X_test_trojaned
 

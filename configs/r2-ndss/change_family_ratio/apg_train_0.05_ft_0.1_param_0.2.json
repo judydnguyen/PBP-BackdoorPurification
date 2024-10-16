@@ -20,13 +20,12 @@
     "target_label": 0,
     "is_backdoor": 1,
     "lr": 0.001,
-    "reverse_lr": 0.001,
     "stddev": 0.5,
     "num_poison": 2,
     "poison_rate": 0.05,
     "ft_size": 0.1,
     "subset_family": "kuguo",
     "troj_type": "Subset",
-    "custom_name": "family_ratio_0.1",
-    "family_ratio": 0.1
+    "custom_name": "family_ratio_0.2",
+    "family_ratio": 0.2
 }
