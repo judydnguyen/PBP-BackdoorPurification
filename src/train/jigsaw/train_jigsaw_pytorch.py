@@ -89,6 +89,9 @@ def get_args():
     config['target_label'] = int(config.get('target_label', TARGET_LABEL))
     config['num_poison'] = int(config.get('num_poison', 4))
     config['num_workers'] = int(config.get('num_workers', 16))
+    config['family_ratio'] = config.get('family_ratio', None)
+    config['overlapping_ratio'] = config.get('overlapping_ratio', None)
+    config['class_ratio'] = config.get('class_ratio', None)
 
     return argparse.Namespace(**config)
 
@@ -278,7 +281,7 @@ if __name__ == "__main__":
     # pre_split_apg_datasets(args, bd_config, parent_p, POISONED_MODELS_FOLDER, args.ft_size, seed=SEED)
     # train_dl, test_dl, ft_loader, X_train, y_train, X_test, y_test = load_apg_data_loaders(parent_p, batch_size=args.batch_size, ft_size=args.ft_size)
     
-    X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal = pre_split_apg_datasets(args, bd_config, parent_p, POISONED_MODELS_FOLDER, args.ft_size, seed=SEED)
+    X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal, _, _ = pre_split_apg_datasets(args, bd_config, parent_p, POISONED_MODELS_FOLDER, args.ft_size, seed=SEED)
     train_dl, test_dl, ft_loader, testloader_mal, X_subset_trojaned = load_apg_subset_data_loaders(args, parent_p, batch_size=args.batch_size, 
                                                                                 ft_size=args.ft_size, subset_family=args.subset_family)
 

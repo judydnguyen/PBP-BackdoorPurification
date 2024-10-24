@@ -97,12 +97,16 @@ def finetune(net, optimizer, criterion,
         # optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.f_lr)
         # retrain_model(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=5, args=args)
         reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, 
-                                                    optimizer_cp, device, f_epochs=2)
+                                                    optimizer_cp, device, 
+                                                    f_epochs=2, args=args)
     
     if ft_mode == 'proposal':
         logger.info("Adding noise to the model")
         # net = add_masked_noise(net, device, stddev=0.2, mask=vectorized_noise_mask)
-        net = add_noise_w(net, device, stddev=0.25)
+        if args.std_noise is not None:
+            net = add_noise_w(net, device, stddev=args.std_noise)
+        else:
+            net = add_noise_w(net, device, stddev=0.25)
         
     prev_model = copy.deepcopy(net)
     
@@ -258,7 +262,9 @@ def main():
 
     POISONED_MODELS_FOLDER = os.path.join('models', POSTFIX)
     
-    X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal, X_train_fam, X_ft_fam = pre_split_apg_datasets(args, bd_config, parent_p, POISONED_MODELS_FOLDER, args.ft_size, seed=SEED)
+    # X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal, X_train_fam, X_ft_fam = pre_split_apg_datasets(args, bd_config, parent_p, POISONED_MODELS_FOLDER, args.ft_size, seed=SEED)
+    X_train, y_train, X_test, y_test, X_subset, X_test_benign, X_test_remain_mal, X_train_fam, X_ft_fam = pre_split_apg_datasets(args, bd_config, parent_p, POISONED_MODELS_FOLDER, args.ft_size, seed=42)
+    
     train_dl, test_dl, ft_loader, testloader_mal, X_subset_trojaned = load_apg_subset_data_loaders(args, parent_p, batch_size=args.batch_size, 
                                                                                 ft_size=args.ft_size, subset_family=args.subset_family, 
                                                                                 X_train_fam=X_train_fam, X_ft_fam=X_ft_fam)
@@ -317,7 +323,8 @@ def main():
     logging_path = f'{args.log_dir}/fam_{args.subset_family}_target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}'
     # ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
     # ft_modes = ['ft']
-    ft_modes = ['proposal']
+    # ft_modes = ['proposal']
+    ft_modes = ['fst']
     ft_results = {}
     for ft_mode in ft_modes:
         ft_results[ft_mode] = {}

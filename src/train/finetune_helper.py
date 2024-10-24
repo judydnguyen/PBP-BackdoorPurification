@@ -69,6 +69,8 @@ def add_args(parser):
         "custom_name": None,
         "family_ratio": None,
         "reverse_lr": None,
+        "mask_ratio": None,
+        "std_noise": None,
     }
     
     # Update default arguments with values from config file

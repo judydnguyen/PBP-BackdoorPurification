@@ -25,5 +25,6 @@
     "poison_rate": 0.05,
     "ft_size": 0.1,
     "custom_name": "class_ratio_0.2",
+    "reverse_lr": 0.001,
     "class_ratio": 0.2
 }

@@ -80,13 +80,18 @@ def finetune(net, optimizer, criterion,
         net_cpy.to(device)
         
         net_cpy.train()
-        # optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.002)
-        optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.f_lr)
-        reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, f_epochs=1)
+        if args.reverse_lr is not None:
+            optimizer_cp = optim.Adam(net_cpy.parameters(), lr=args.reverse_lr)
+        else:
+            optimizer_cp = optim.Adam(net_cpy.parameters(), lr=0.002)
+        
+        reversed_net, vectorized_mask = reverse_net(net_cpy, ft_dl, test_dl, backdoor_dl, optimizer_cp, device, 
+                                                    f_epochs=1, args=args)
 
     
     if ft_mode == 'proposal':
         net = add_noise_w(net, device, stddev=0.5)
+        
     prev_model = copy.deepcopy(net)
     
     for epoch in tqdm(range(f_epochs), desc=f'Fine-tuning mode: {ft_mode}'):
@@ -264,7 +269,7 @@ def main():
     logging_path = f'{args.log_dir}/target_{args.attack_target}-archi_{args.model}-dataset_{args.dataset}--f_epochs_{args.f_epochs}--f_lr_{args.f_lr}/ft_size_{args.ft_size}_p_rate{round(args.poison_rate, 4)}'
     # ft_modes = ['ft', 'ft-init', 'fe-tuning', 'lp', 'fst', 'proposal']
     # ft_modes = ['ft-init']
-    ft_modes = ['proposal']
+    ft_modes = ['fst']
     ft_results = {}
 
     for ft_mode in ft_modes:

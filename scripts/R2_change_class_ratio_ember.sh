@@ -1,3 +1,4 @@
+#!/bin/bash
 FOLDER_PATH="configs/r2-ndss/change_class_ratio/ember"
 
 # Iterate over each file in the configuration directory

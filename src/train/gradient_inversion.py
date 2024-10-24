@@ -112,7 +112,9 @@ def reverse_net(net, dataloader, test_loader, bd_loader, optimizer, device, f_ep
     net.to(device)
     net.train()
     prev_model = copy.deepcopy(net)
-    
+    # get mask ratio from args else set default 0.05
+    mask_ratio = args.mask_ratio if args.mask_ratio is not None else 0.05
+    print(f"mask_ratio: {mask_ratio}")
     for epoch in tqdm(range(f_epochs), desc=f'Reversing-model: '):
         # bn_stats = get_bn_stats(net)
         # import IPython; IPython.embed()
@@ -142,7 +144,7 @@ def reverse_net(net, dataloader, test_loader, bd_loader, optimizer, device, f_ep
             loss.backward()
             optimizer.step()
             
-            mask_grad_list = get_batch_grad_mask(net, device=device, ratio=0.05, opt="top")
+            mask_grad_list = get_batch_grad_mask(net, device=device, ratio=mask_ratio, opt="top")
             vectorized_mask = torch.cat([p.view(-1) for p in mask_grad_list])
             
             # net = 

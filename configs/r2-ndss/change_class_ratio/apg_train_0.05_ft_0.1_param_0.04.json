@@ -27,5 +27,6 @@
     "subset_family": "kuguo",
     "troj_type": "Subset",
     "custom_name": "class_ratio_0.04",
-    "class_ratio": 0.04
+    "class_ratio": 0.04,
+    "std_noise": 0.2
 }

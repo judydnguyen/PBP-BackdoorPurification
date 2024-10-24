@@ -10,7 +10,7 @@
     "linear_name": "dense4",
     "ft_mode": "proposal",
     "f_epochs": 10,
-    "f_lr": 0.0001,
+    "f_lr": 0.0002,
     "device": "cuda",
     "imsize": 64,
     "conv1": 32,
@@ -26,7 +26,6 @@
     "ft_size": 0.1,
     "subset_family": "kuguo",
     "troj_type": "Subset",
-    "custom_name": "class_ratio_0.15",
-    "class_ratio": 0.15,
-    "std_noise": 0.2
+    "custom_name": "mask_ratio_0.02",
+    "mask_ratio": 0.02
 }

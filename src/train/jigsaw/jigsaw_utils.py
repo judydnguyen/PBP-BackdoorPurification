@@ -280,6 +280,10 @@ def load_extracted_data(y_filename, sha_family_file, subset_family):
     # sha_family_file = f'data/{dataset}/apg_sha_family.csv' # aligned with apg-X.json, apg-y.json, apg-meta.json
     df = pd.read_csv(sha_family_file, header=0)
     
+    # count all the family in the dataset
+    logger.info(f'family count: {Counter(df.family)}')
+    logger.info(f'total number of families: {len(set(df.family))}')
+    
     subset_idx_array = df[df.family == subset_family].index.to_numpy()
     logger.info(f'subset size: {len(subset_idx_array)}')
     
@@ -446,6 +450,7 @@ def pre_split_apg_datasets(args, config, parent_path, MODELS_FOLDER, ft_size=0.0
     #                                                                 args.subset_family, sha_family_file)
     y_subset = np.zeros(X_subset.shape[0])
     
+    
     stratify_labels = np.array(y_train_all)
     train_ft_indices = np.arange(X_train_all.shape[0])
     # Stratify split train and fine-tuning using 
@@ -518,9 +523,9 @@ def customize_finetune_subloader(train_loader, ft_loader,
     # reused_indices = all_train_indices_shuffled[:reused_samples_cnt]
     # # Use train_test_split to get reused indices while maintaining class ratios
     
-    _, reused_indices = train_test_split(
+    reused_indices, _ = train_test_split(
         range(len(train_set)), 
-        train_size=reused_samples_cnt, 
+        train_size=reused_samples_cnt/len(train_set), 
         stratify=labels, 
         random_state=12
     )
@@ -599,11 +604,11 @@ def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0, dataset="apg
     negative_indices_train = np.where(y_train == 0)[0]
 
     # shuffle the indices
-    # np.random.shuffle(positive_indices_train)
-    # np.random.shuffle(negative_indices_train)
+    np.random.shuffle(positive_indices_train)
+    np.random.shuffle(negative_indices_train)
     
-    # np.random.shuffle(selected_positive_indices)
-    # np.random.shuffle(selected_negative_indices)
+    np.random.shuffle(selected_positive_indices)
+    np.random.shuffle(selected_negative_indices)
 
     selected_train_positive_indices, selected_train_negative_indices = [], []
     selected_ft_positive_indices, selected_ft_negative_indices = [], []
@@ -630,6 +635,7 @@ def customize_class_ratio(train_loader, ft_loader, class_ratio=0.0, dataset="apg
     elif len(selected_train_positive_indices):
         train_subset = Subset(train_set, selected_train_positive_indices)
     else:
+        train_subset = train_set
         print(colored("No need to sample more data or there is a bug", "blue"))
 
     ft_indices = np.concatenate((selected_ft_positive_indices, selected_ft_negative_indices))
@@ -680,6 +686,7 @@ def customize_family_ratio(X_train, y_train, X_ft, y_ft, X_train_fam, X_ft_fam,
     total_fam_train = len(train_fam)
     total_fam_ft = len(ft_fam)
     
+    print(colored(f"Total family count in training set: {total_fam_train}, total ft fam: {total_fam_ft}", "red"))
     print(colored(f"Current ratio of classes in ft set compared to train set: {total_fam_ft/total_fam_train}", "red"))
     
     required_ft_fam_cnt = int(total_fam_train * family_ratio)
@@ -695,10 +702,15 @@ def customize_family_ratio(X_train, y_train, X_ft, y_ft, X_train_fam, X_ft_fam,
         # don't remove "NA" family
         
         remaining_fam = np.random.choice(ft_fam, required_ft_fam_cnt, replace=False)
+        # remaining_fam = ft_fam[:required_ft_fam_cnt]
         if 'NA' not in remaining_fam:
             remaining_fam = np.append(remaining_fam, 'NA')
             remaining_fam = remaining_fam[1:]
+            
+        print(f"Remaining family count: {len(remaining_fam)},\tremaining_fam: {remaining_fam}")
         remaining_indices = np.where(np.isin(X_ft_fam, remaining_fam))[0]
+        # import IPython; IPython.embed()
+        print(f"Remaining indices: {len(remaining_indices)}")
         X_ft = X_ft[remaining_indices]
         y_ft = y_ft[remaining_indices]
         
